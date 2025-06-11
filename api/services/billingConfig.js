@@ -71,9 +71,6 @@ class BillingConfig {
       if (!process.env.PADDLE_WEBHOOK_SECRET) {
         issues.push('PADDLE_WEBHOOK_SECRET is required when BILLING_MODE=subscription');
       }
-      if (!process.env.PADDLE_VENDOR_ID) {
-        issues.push('PADDLE_VENDOR_ID is required when BILLING_MODE=subscription');
-      }
     }
     
     // Validate notification thresholds

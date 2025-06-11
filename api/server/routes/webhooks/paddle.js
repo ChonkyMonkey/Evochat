@@ -43,8 +43,9 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
     
     logger.info(`[PaddleWebhook] Processing event: ${eventType}`);
     
-    // Handle different webhook events
+    // Handle different webhook events (modern Paddle API)
     switch (eventType) {
+      case 'subscription.activated':
       case 'subscription.created':
         await handleSubscriptionCreated(data);
         break;
@@ -54,6 +55,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
         break;
         
       case 'subscription.canceled':
+      case 'subscription.cancelled':
         await handleSubscriptionCanceled(data);
         break;
         
@@ -71,6 +73,14 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
         
       case 'transaction.payment_failed':
         await handlePaymentFailed(data);
+        break;
+        
+      case 'price.updated':
+        await handlePriceUpdated(data);
+        break;
+        
+      case 'product.updated':
+        await handleProductUpdated(data);
         break;
         
       default:
@@ -307,6 +317,70 @@ async function handlePaymentFailed(data) {
     
   } catch (error) {
     logger.error('[PaddleWebhook] Error handling payment failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Handles price updated events from Paddle
+ */
+async function handlePriceUpdated(data) {
+  try {
+    logger.info(`[PaddleWebhook] Handling price updated: ${data.id}`);
+    
+    const { id: priceId, product_id: productId, unit_amount } = data;
+    
+    // Find and update the local plan
+    const { getPlanByPaddleId, updatePlan } = require('~/models/Plan');
+    const plan = await getPlanByPaddleId(productId);
+    
+    if (plan) {
+      await updatePlan(plan._id, {
+        price: unit_amount,
+        paddlePriceId: priceId,
+      });
+      
+      logger.info(`[PaddleWebhook] Updated plan pricing: ${plan.name} -> €${(unit_amount / 100).toFixed(2)}`);
+    } else {
+      logger.warn(`[PaddleWebhook] No local plan found for product: ${productId}`);
+    }
+    
+  } catch (error) {
+    logger.error('[PaddleWebhook] Error handling price updated:', error);
+    throw error;
+  }
+}
+
+/**
+ * Handles product updated events from Paddle
+ */
+async function handleProductUpdated(data) {
+  try {
+    logger.info(`[PaddleWebhook] Handling product updated: ${data.id}`);
+    
+    const { id: productId, name, description } = data;
+    
+    // Find and update the local plan
+    const { getPlanByPaddleId, updatePlan } = require('~/models/Plan');
+    const plan = await getPlanByPaddleId(productId);
+    
+    if (plan) {
+      await updatePlan(plan._id, {
+        name: name || plan.name,
+        description: description || plan.description,
+      });
+      
+      logger.info(`[PaddleWebhook] Updated plan details: ${plan.name}`);
+    } else {
+      // Product might be new - trigger a sync
+      logger.info(`[PaddleWebhook] New product detected, triggering sync: ${productId}`);
+      const { getPaddleService } = require('~/services/paddle');
+      const paddleService = getPaddleService();
+      await paddleService.syncPlansFromPaddle();
+    }
+    
+  } catch (error) {
+    logger.error('[PaddleWebhook] Error handling product updated:', error);
     throw error;
   }
 }

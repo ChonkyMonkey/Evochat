@@ -7,7 +7,6 @@ const { logger } = require('@librechat/data-schemas');
 class PaddleService {
   constructor() {
     this.apiKey = process.env.PADDLE_API_KEY;
-    this.vendorId = process.env.PADDLE_VENDOR_ID;
     this.environment = process.env.PADDLE_ENVIRONMENT || 'sandbox';
     this.webhookSecret = process.env.PADDLE_WEBHOOK_SECRET;
     
@@ -15,12 +14,47 @@ class PaddleService {
       logger.warn('[PaddleService] PADDLE_API_KEY not configured - subscription features will not work');
     }
     
-    // Paddle API base URL (changes between sandbox and production)
-    this.baseUrl = this.environment === 'production' 
-      ? 'https://api.paddle.com' 
+    // Modern Paddle Billing API base URL
+    this.baseUrl = this.environment === 'production'
+      ? 'https://api.paddle.com'
       : 'https://sandbox-api.paddle.com';
       
+    // Default headers for Paddle API requests
+    this.headers = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+      
     logger.info(`[PaddleService] Initialized in ${this.environment} mode`);
+  }
+
+  /**
+   * Makes HTTP request to Paddle API
+   * @param {string} endpoint - API endpoint
+   * @param {Object} options - Request options
+   * @returns {Promise<Object>} API response
+   */
+  async makeRequest(endpoint, options = {}) {
+    try {
+      const url = `${this.baseUrl}${endpoint}`;
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...this.headers,
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Paddle API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      logger.error(`[PaddleService] API request failed: ${endpoint}`, error);
+      throw error;
+    }
   }
 
   /**
@@ -230,6 +264,203 @@ class PaddleService {
   }
 
   /**
+   * Syncs plans from Paddle to local database
+   * @returns {Promise<Array>} Synced plans
+   */
+  async syncPlansFromPaddle() {
+    try {
+      logger.info('[PaddleService] Syncing plans from Paddle API...');
+      
+      if (!this.apiKey) {
+        throw new Error('Paddle API key not configured');
+      }
+      
+      // Fetch products and prices from modern Paddle API
+      const productsResponse = await this.makeRequest('/products?status=active');
+      const pricesResponse = await this.makeRequest('/prices?status=active');
+      
+      const products = productsResponse.data || [];
+      const prices = pricesResponse.data || [];
+      
+      logger.debug(`[PaddleService] Fetched ${products.length} products and ${prices.length} prices from Paddle`);
+      
+      const { createPlan, getPlanByPaddleId } = require('~/models/Plan');
+      const syncedPlans = [];
+      
+      // Match products with their prices
+      for (const product of products) {
+        // Find prices for this product
+        const productPrices = prices.filter(price => price.product_id === product.id);
+        
+        if (productPrices.length === 0) {
+          logger.warn(`[PaddleService] No prices found for product: ${product.name}`);
+          continue;
+        }
+        
+        // Use the first active price (assuming one price per product for simplicity)
+        const price = productPrices[0];
+        
+        // Check if plan already exists
+        const existingPlan = await getPlanByPaddleId(product.id);
+        
+        if (!existingPlan) {
+          // Map LibreChat features to Paddle products
+          const planData = this.mapPaddleProductToPlan(product, price);
+          const newPlan = await createPlan(planData);
+          syncedPlans.push(newPlan);
+          logger.info(`[PaddleService] Created plan: ${newPlan.name}`);
+        } else {
+          // Update existing plan with latest pricing
+          const { updatePlan } = require('~/models/Plan');
+          await updatePlan(existingPlan._id, {
+            price: parseInt(price.unit_amount),
+            currency: price.currency_code,
+            paddlePriceId: price.id,
+          });
+          syncedPlans.push(existingPlan);
+          logger.debug(`[PaddleService] Updated existing plan: ${product.name}`);
+        }
+      }
+      
+      logger.info(`[PaddleService] Synced ${syncedPlans.length} plans from Paddle`);
+      return syncedPlans;
+      
+    } catch (error) {
+      logger.error('[PaddleService] Error syncing plans from Paddle:', error);
+      
+      // Fallback to mock data for development
+      logger.info('[PaddleService] Using mock data for development');
+      return await this.createMockPlansForDevelopment();
+    }
+  }
+
+  /**
+   * Creates mock plans for development when Paddle API is not available
+   * @returns {Promise<Array>} Mock plans
+   */
+  async createMockPlansForDevelopment() {
+    const mockPaddleData = [
+      {
+        product: {
+          id: 'prod_basic_librechat_dev',
+          name: 'LibreChat Basic',
+          description: 'Basic plan with €10 monthly token allowance',
+          status: 'active',
+        },
+        price: {
+          id: 'pri_basic_monthly_dev',
+          product_id: 'prod_basic_librechat_dev',
+          unit_amount: '1500', // €15.00 in cents
+          currency_code: 'EUR',
+          billing_cycle: {
+            interval: 'month',
+            frequency: 1,
+          },
+        },
+      },
+      {
+        product: {
+          id: 'prod_pro_librechat_dev',
+          name: 'LibreChat Pro',
+          description: 'Pro plan with unlimited usage',
+          status: 'active',
+        },
+        price: {
+          id: 'pri_pro_monthly_dev',
+          product_id: 'prod_pro_librechat_dev',
+          unit_amount: '5000', // €50.00 in cents
+          currency_code: 'EUR',
+          billing_cycle: {
+            interval: 'month',
+            frequency: 1,
+          },
+        },
+      },
+    ];
+    
+    const { createPlan, getPlanByPaddleId } = require('~/models/Plan');
+    const syncedPlans = [];
+    
+    for (const item of mockPaddleData) {
+      const { product, price } = item;
+      
+      // Check if plan already exists
+      const existingPlan = await getPlanByPaddleId(product.id);
+      
+      if (!existingPlan) {
+        // Map LibreChat features to Paddle products
+        const planData = this.mapPaddleProductToPlan(product, price);
+        const newPlan = await createPlan(planData);
+        syncedPlans.push(newPlan);
+        logger.info(`[PaddleService] Created mock plan: ${newPlan.name}`);
+      } else {
+        syncedPlans.push(existingPlan);
+      }
+    }
+    
+    return syncedPlans;
+  }
+
+  /**
+   * Maps Paddle product data to LibreChat plan format
+   * @param {Object} product - Paddle product (modern API format)
+   * @param {Object} price - Paddle price (modern API format)
+   * @returns {Object} Plan data for LibreChat
+   */
+  mapPaddleProductToPlan(product, price) {
+    // Determine LibreChat-specific features based on product
+    let tokenQuotaMonthly;
+    let allowedModels;
+    let features;
+    
+    if (product.name.toLowerCase().includes('basic')) {
+      tokenQuotaMonthly = parseInt(process.env.BASIC_PLAN_QUOTA) || 1000;
+      allowedModels = [
+        'gpt-3.5-turbo',
+        'gpt-3.5-turbo-16k',
+        'claude-instant-1',
+        'claude-instant-1.2',
+      ];
+      features = [
+        'Standard models access',
+        `€${(tokenQuotaMonthly / 100).toFixed(2)} monthly token quota`,
+        'Email support',
+        'Usage analytics',
+      ];
+    } else if (product.name.toLowerCase().includes('pro')) {
+      tokenQuotaMonthly = parseInt(process.env.PRO_PLAN_QUOTA) || -1;
+      allowedModels = ['*']; // All models
+      features = [
+        'All models access',
+        'Unlimited usage',
+        'Priority support',
+        'Advanced analytics',
+        'API access',
+        'Custom integrations',
+      ];
+    } else {
+      // Default configuration
+      tokenQuotaMonthly = 500;
+      allowedModels = ['gpt-3.5-turbo'];
+      features = ['Basic access'];
+    }
+    
+    return {
+      name: product.name,
+      paddleProductId: product.id,
+      paddlePriceId: price.id,
+      price: parseInt(price.unit_amount), // Modern API returns string
+      currency: price.currency_code.toUpperCase(), // Modern API uses currency_code
+      interval: price.billing_cycle?.interval || 'month',
+      tokenQuotaMonthly,
+      allowedModels,
+      features,
+      description: product.description || `${product.name} subscription plan`,
+      isActive: product.status === 'active',
+    };
+  }
+
+  /**
    * Verifies a webhook signature
    * @param {string} rawBody - Raw webhook body
    * @param {string} signature - Webhook signature
@@ -263,7 +494,6 @@ class PaddleService {
     const issues = [];
     
     if (!this.apiKey) issues.push('Missing PADDLE_API_KEY');
-    if (!this.vendorId) issues.push('Missing PADDLE_VENDOR_ID');
     if (!this.webhookSecret) issues.push('Missing PADDLE_WEBHOOK_SECRET');
     
     return {

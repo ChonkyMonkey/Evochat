@@ -142,59 +142,91 @@ async function seedDefaultPlans() {
       return;
     }
 
-    const defaultPlans = [
-      {
-        name: 'Basic',
-        paddleProductId: 'prod_basic_placeholder', // To be replaced with actual Paddle IDs
-        paddlePriceId: 'price_basic_placeholder',
-        price: 1500, // €15.00 in cents
-        currency: 'EUR',
-        interval: 'month',
-        tokenQuotaMonthly: 1000, // €10.00 worth of tokens in cents
-        allowedModels: [
-          'gpt-3.5-turbo',
-          'gpt-3.5-turbo-16k',
-          'claude-instant-1',
-          'claude-instant-1.2',
-        ],
-        features: [
-          'Standard models access',
-          '€10 monthly token quota',
-          'Email support',
-          'Usage analytics',
-        ],
-        isActive: true,
-      },
-      {
-        name: 'Pro',
-        paddleProductId: 'prod_pro_placeholder', // To be replaced with actual Paddle IDs
-        paddlePriceId: 'price_pro_placeholder',
-        price: 5000, // €50.00 in cents
-        currency: 'EUR',
-        interval: 'month',
-        tokenQuotaMonthly: -1, // Unlimited (represented as -1)
-        allowedModels: ['*'], // All models
-        features: [
-          'All models access',
-          'Unlimited usage',
-          'Priority support',
-          'Advanced analytics',
-          'API access',
-          'Custom integrations',
-        ],
-        isActive: true,
-      },
-    ];
-
-    for (const planData of defaultPlans) {
-      await createPlan(planData);
+    // Use Paddle as single source of truth for pricing
+    logger.info('[Plan] Syncing plans from Paddle API...');
+    
+    const { getPaddleService } = require('~/services/paddle');
+    const paddleService = getPaddleService();
+    
+    // Validate Paddle configuration first
+    const validation = paddleService.validateConfiguration();
+    if (!validation.isValid) {
+      logger.warn('[Plan] Paddle not configured, creating placeholder plans:', validation.issues);
+      await createPlaceholderPlans();
+      return;
     }
-
-    logger.info('[Plan] Default plans seeded successfully');
+    
+    try {
+      // Sync plans from Paddle
+      const syncedPlans = await paddleService.syncPlansFromPaddle();
+      logger.info(`[Plan] Successfully synced ${syncedPlans.length} plans from Paddle`);
+    } catch (paddleError) {
+      logger.warn('[Plan] Failed to sync from Paddle, creating placeholder plans:', paddleError.message);
+      await createPlaceholderPlans();
+    }
+    
   } catch (error) {
-    logger.error('[Plan] Error seeding default plans:', error);
+    logger.error('[Plan] Error seeding plans:', error);
     throw error;
   }
+}
+
+/**
+ * Creates placeholder plans when Paddle is not available
+ * @returns {Promise<void>}
+ */
+async function createPlaceholderPlans() {
+  const placeholderPlans = [
+    {
+      name: 'Basic',
+      paddleProductId: 'placeholder_basic',
+      paddlePriceId: 'placeholder_basic_price',
+      price: 1500, // €15.00 in cents
+      currency: 'EUR',
+      interval: 'month',
+      tokenQuotaMonthly: parseInt(process.env.BASIC_PLAN_QUOTA) || 1000,
+      allowedModels: [
+        'gpt-3.5-turbo',
+        'gpt-3.5-turbo-16k',
+        'claude-instant-1',
+        'claude-instant-1.2',
+      ],
+      features: [
+        'Standard models access',
+        `€${((parseInt(process.env.BASIC_PLAN_QUOTA) || 1000) / 100).toFixed(2)} monthly token quota`,
+        'Email support',
+        'Usage analytics',
+      ],
+      description: 'Basic plan for LibreChat with standard model access',
+      isActive: true,
+    },
+    {
+      name: 'Pro',
+      paddleProductId: 'placeholder_pro',
+      paddlePriceId: 'placeholder_pro_price',
+      price: 5000, // €50.00 in cents
+      currency: 'EUR',
+      interval: 'month',
+      tokenQuotaMonthly: parseInt(process.env.PRO_PLAN_QUOTA) || -1,
+      allowedModels: ['*'], // All models
+      features: [
+        'All models access',
+        'Unlimited usage',
+        'Priority support',
+        'Advanced analytics',
+        'API access',
+        'Custom integrations',
+      ],
+      description: 'Pro plan for LibreChat with unlimited access',
+      isActive: true,
+    },
+  ];
+
+  for (const planData of placeholderPlans) {
+    await createPlan(planData);
+  }
+  
+  logger.info('[Plan] Created placeholder plans (configure Paddle for real pricing)');
 }
 
 /**
@@ -269,6 +301,7 @@ module.exports = {
   updatePlan,
   deactivatePlan,
   seedDefaultPlans,
+  createPlaceholderPlans,
   getPlansForComparison,
   isModelAllowedForPlan,
   getModelsForPlan,
