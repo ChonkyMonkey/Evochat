@@ -20,6 +20,9 @@ import { createPromptGroupModel } from './promptGroup';
 import { createConversationTagModel } from './conversationTag';
 import { createSharedLinkModel } from './sharedLink';
 import { createToolCallModel } from './toolCall';
+import { createSubscriptionModel } from './subscription';
+import { createPlanModel } from './plan';
+import { createUsageRecordModel } from './usageRecord';
 
 /**
  * Creates all database models for all collections
@@ -48,5 +51,8 @@ export function createModels(mongoose: typeof import('mongoose')) {
     ConversationTag: createConversationTagModel(mongoose),
     SharedLink: createSharedLinkModel(mongoose),
     ToolCall: createToolCallModel(mongoose),
+    Subscription: createSubscriptionModel(mongoose),
+    Plan: createPlanModel(mongoose),
+    UsageRecord: createUsageRecordModel(mongoose),
   };
 }

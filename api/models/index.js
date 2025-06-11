@@ -23,6 +23,43 @@ const {
 const { getConvoTitle, getConvo, saveConvo, deleteConvos } = require('./Conversation');
 const { getPreset, getPresets, savePreset, deletePresets } = require('./Preset');
 
+// Subscription-related imports
+const {
+  createSubscription,
+  getUserSubscription,
+  updateSubscription,
+  cancelSubscription,
+  getSubscriptionStatus,
+  hasModelAccess,
+  getSubscriptions,
+  resetMonthlyQuota,
+} = require('./Subscription');
+
+const {
+  createPlan,
+  getActivePlans,
+  getPlanById,
+  getPlanByName,
+  getPlanByPaddleId,
+  updatePlan,
+  deactivatePlan,
+  seedDefaultPlans,
+  getPlansForComparison,
+  isModelAllowedForPlan,
+  getModelsForPlan,
+} = require('./Plan');
+
+const {
+  recordUsage,
+  getMonthlyUsage,
+  getWeeklyUsage,
+  getUserUsageHistory,
+  getDailyUsage,
+  checkWeeklyWarning,
+  getTopModelsByUsage,
+  cleanupOldRecords,
+} = require('./UsageRecord');
+
 module.exports = {
   ...methods,
   comparePassword,
@@ -51,4 +88,37 @@ module.exports = {
   getPresets,
   savePreset,
   deletePresets,
+
+  // Subscription methods
+  createSubscription,
+  getUserSubscription,
+  updateSubscription,
+  cancelSubscription,
+  getSubscriptionStatus,
+  hasModelAccess,
+  getSubscriptions,
+  resetMonthlyQuota,
+
+  // Plan methods
+  createPlan,
+  getActivePlans,
+  getPlanById,
+  getPlanByName,
+  getPlanByPaddleId,
+  updatePlan,
+  deactivatePlan,
+  seedDefaultPlans,
+  getPlansForComparison,
+  isModelAllowedForPlan,
+  getModelsForPlan,
+
+  // Usage tracking methods
+  recordUsage,
+  getMonthlyUsage,
+  getWeeklyUsage,
+  getUserUsageHistory,
+  getDailyUsage,
+  checkWeeklyWarning,
+  getTopModelsByUsage,
+  cleanupOldRecords,
 };
