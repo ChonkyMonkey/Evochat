@@ -2,13 +2,13 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 
 // @ts-ignore
 export interface IPlan extends Document {
-  name: 'Basic' | 'Pro';
+  name: string;
   paddleProductId: string;
   paddlePriceId: string;
   price: number; // in cents
   currency: string;
   interval: 'month' | 'year';
-  tokenQuotaMonthly: number; // in cents worth of tokens
+  tokenQuotaMonthly: number; // in cents worth of tokens, -1 for unlimited
   allowedModels: string[];
   features: string[];
   isActive: boolean;
@@ -20,7 +20,6 @@ const planSchema: Schema<IPlan> = new Schema(
   {
     name: {
       type: String,
-      enum: ['Basic', 'Pro'],
       required: true,
     },
     paddleProductId: {
@@ -51,7 +50,7 @@ const planSchema: Schema<IPlan> = new Schema(
     tokenQuotaMonthly: {
       type: Number,
       required: true,
-      min: 0,
+      min: -1, // Allow -1 for unlimited
     },
     allowedModels: {
       type: [String],
@@ -78,9 +77,9 @@ planSchema.pre('save', function (next: any) {
     return next(new Error('Plan price must be greater than 0'));
   }
   
-  // Validate token quota is positive
-  if ((this as any).tokenQuotaMonthly <= 0) {
-    return next(new Error('Token quota must be greater than 0'));
+  // Validate token quota is -1 (unlimited) or positive
+  if ((this as any).tokenQuotaMonthly < -1 || (this as any).tokenQuotaMonthly === 0) {
+    return next(new Error('Token quota must be -1 (unlimited) or greater than 0'));
   }
   
   next();
@@ -100,6 +99,9 @@ planSchema.methods.getPriceFormatted = function () {
 };
 
 planSchema.methods.getTokenQuotaFormatted = function () {
+  if ((this as any).tokenQuotaMonthly === -1) {
+    return 'Unlimited';
+  }
   const quota = (this as any).tokenQuotaMonthly / 100;
   return new Intl.NumberFormat('de-DE', {
     style: 'currency',

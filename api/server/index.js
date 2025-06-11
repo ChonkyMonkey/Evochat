@@ -49,6 +49,8 @@ const startServer = async () => {
       logger.info('Subscription system initialized');
     } catch (error) {
       logger.warn('Subscription system initialization failed:', error.message);
+      logger.info('LibreChat will continue without subscription features');
+      // Don't throw error - let the app continue without subscription features
     }
   }
 
