@@ -254,6 +254,7 @@ export const getAllPromptGroups = () => `${prompts()}/all`;
 export const roles = () => '/api/roles';
 export const getRole = (roleName: string) => `${roles()}/${roleName.toLowerCase()}`;
 export const updatePromptPermissions = (roleName: string) => `${getRole(roleName)}/prompts`;
+export const updateMemoryPermissions = (roleName: string) => `${getRole(roleName)}/memories`;
 export const updateAgentPermissions = (roleName: string) => `${getRole(roleName)}/agents`;
 
 /* Conversation Tags */
@@ -284,6 +285,11 @@ export const disableTwoFactor = () => '/api/auth/2fa/disable';
 export const regenerateBackupCodes = () => '/api/auth/2fa/backup/regenerate';
 export const verifyTwoFactorTemp = () => '/api/auth/2fa/verify-temp';
 
+/* Memories */
+export const memories = () => '/api/memories';
+export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
+export const memoryPreferences = () => `${memories()}/preferences`;
+
 // Subscription Endpoints
 export const subscription = () => '/api/subscription';
 export const subscriptionPlans = () => '/api/subscription/plans';
@@ -295,3 +301,4 @@ export const subscriptionCancel = () => '/api/subscription/cancel';
 export const subscriptionUpdate = () => '/api/subscription/update';
 export const subscriptionResume = () => '/api/subscription/resume';
 export const subscriptionHistory = () => '/api/subscription/history';
+

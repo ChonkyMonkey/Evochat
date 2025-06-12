@@ -21,6 +21,8 @@ export { default as tokenSchema } from './token';
 export { default as toolCallSchema } from './toolCall';
 export { default as transactionSchema } from './transaction';
 export { default as userSchema } from './user';
+export { default as memorySchema } from './memory';
+
 export { default as subscriptionSchema } from './subscription';
 export { default as planSchema } from './plan';
 export { default as usageRecordSchema } from './usageRecord';
