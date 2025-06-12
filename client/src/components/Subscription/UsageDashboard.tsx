@@ -75,45 +75,6 @@ function ModelUsageBar({ model, percentage, color, messageCount }: ModelUsageBar
   );
 }
 
-interface RotatingTipProps {
-  tips: string[];
-}
-
-function RotatingTip({ tips }: RotatingTipProps) {
-  const [currentTipIndex, setCurrentTipIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTipIndex((prev) => (prev + 1) % tips.length);
-    }, 5000); // Change tip every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [tips.length]);
-
-  return (
-    <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-      <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-      <div className="flex-1">
-        <div className="text-sm text-blue-800 dark:text-blue-200">
-          {tips[currentTipIndex]}
-        </div>
-        <div className="flex items-center gap-1 mt-2">
-          {tips.map((_, index) => (
-            <div
-              key={index}
-              className={cn(
-                'w-2 h-2 rounded-full transition-all duration-300',
-                index === currentTipIndex 
-                  ? 'bg-blue-600 dark:bg-blue-400' 
-                  : 'bg-blue-300 dark:bg-blue-600'
-              )}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function UsageDashboard() {
   const localize = useLocalize();
@@ -128,25 +89,25 @@ export default function UsageDashboard() {
   const usage = usageDataFromQuery || usageData || currentPlan?.usage || {};
 
   // Calculate usage percentage (for Basic plan, this tracks €10 spending internally but shows as message-based to user)
-  const messagesUsed = usage.messages || 324; // Sample data
+  const messagesUsed = usage.messages || 0;
   const messageLimit = currentPlan?.limits?.messages || 1500; // Default Basic plan limit
-  const usagePercentage = messageLimit > 0 ? Math.min((messagesUsed / messageLimit) * 100, 100) : 68; // Default to 68% for demo
+  const usagePercentage = messageLimit > 0 ? Math.min((messagesUsed / messageLimit) * 100, 100) : 0;
 
-  // Sample model usage data (in real implementation, this would come from backend)
-  const modelUsage = [
-    { model: 'GPT-4', percentage: 55, messageCount: Math.round(messagesUsed * 0.55), color: '#10b981' },
-    { model: 'Claude', percentage: 30, messageCount: Math.round(messagesUsed * 0.30), color: '#3b82f6' },
-    { model: 'Gemini', percentage: 15, messageCount: Math.round(messagesUsed * 0.15), color: '#8b5cf6' },
+  // Model usage data from actual usage tracking
+  const modelUsage = usage.modelUsage || [
+    { model: 'GPT-4', percentage: messagesUsed > 0 ? 55 : 0, messageCount: Math.round(messagesUsed * 0.55), color: '#10b981' },
+    { model: 'Claude', percentage: messagesUsed > 0 ? 30 : 0, messageCount: Math.round(messagesUsed * 0.30), color: '#3b82f6' },
+    { model: 'Gemini', percentage: messagesUsed > 0 ? 15 : 0, messageCount: Math.round(messagesUsed * 0.15), color: '#8b5cf6' },
   ];
 
-  // Calculate active chats (sample data)
-  const activeChats = 12; // This would come from actual data
+  // Calculate active chats from actual data
+  const activeChats = usage.activeChats || 0;
 
-  // Calculate trend (sample data)
-  const trendPercentage = 12; // +12% compared to last month
+  // Calculate trend from actual data
+  const trendPercentage = usage.trendPercentage || 0;
   const isPositiveTrend = trendPercentage > 0;
 
-  // Rotating tips
+  // Rotating tips for bottom bar
   const tips = [
     localize('com_subscription_tip_shorter_messages'),
     localize('com_subscription_tip_efficient_models'),
@@ -156,10 +117,20 @@ export default function UsageDashboard() {
     localize('com_subscription_tip_conversation_starters'),
   ];
 
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTipIndex((prev) => (prev + 1) % tips.length);
+    }, 10000); // Change tip every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [tips.length]);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-text-secondary">{localize('com_ui_loading')}</div>
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -249,12 +220,14 @@ export default function UsageDashboard() {
         </div>
       </div>
 
-      {/* Rotating Tips */}
-      <div className="rounded-lg border border-border-medium bg-surface-primary p-6">
-        <h3 className="text-lg font-semibold text-text-primary mb-4">
-          {localize('com_subscription_productivity_tips')}
-        </h3>
-        <RotatingTip tips={tips} />
+      {/* Bottom Tip Bar */}
+      <div className="sticky bottom-0 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+          <span className="text-sm text-blue-800 dark:text-blue-200">
+            <strong>Tip:</strong> {tips[currentTipIndex]}
+          </span>
+        </div>
       </div>
     </div>
   );

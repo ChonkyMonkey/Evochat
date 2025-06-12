@@ -3,6 +3,7 @@ import { Check, Star, Zap } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { Button } from '~/components/ui';
 import { usePaddleCheckout } from '~/contexts/PaddleProvider';
+import { useGetAvailablePlans } from '~/data-provider';
 import { cn } from '~/utils';
 
 interface PlanFeature {
@@ -21,7 +22,8 @@ interface Plan {
   paddleProductId?: string;
 }
 
-const plans: Plan[] = [
+// Fallback plans if backend is not available
+const fallbackPlans: Plan[] = [
   {
     id: 'basic',
     name: 'com_subscription_plan_basic',
@@ -68,6 +70,18 @@ const plans: Plan[] = [
 export default function PlanSelection() {
   const localize = useLocalize();
   const { openCheckout } = usePaddleCheckout();
+  const { data: backendPlans, isLoading: plansLoading } = useGetAvailablePlans();
+  
+  // Use backend plans if available, otherwise fallback to hardcoded plans
+  const plans = backendPlans || fallbackPlans;
+  
+  if (plansLoading) {
+    return (
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const handleSelectPlan = async (plan: Plan) => {
 

@@ -1133,5 +1133,6 @@
   "com_subscription_trend_down": "↘ {{percentage}}% compared to last month",
   "com_subscription_productivity_tips": "💡 Productivity Tips",
   "com_subscription_tip_different_models": "Try different AI models to find the best fit for each task",
-  "com_subscription_tip_conversation_starters": "Use conversation starters to get better responses"
+  "com_subscription_tip_conversation_starters": "Use conversation starters to get better responses",
+  "com_billing_no_subscription_help": "Subscribe to a plan to view your billing history and manage invoices."
 }

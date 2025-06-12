@@ -105,7 +105,7 @@ export default function SubscriptionDialog({ open, onOpenChange }: TDialogProps)
           <div className={cn('fixed inset-0 flex w-screen items-center justify-center p-4')}>
             <DialogPanel
               className={cn(
-                'min-h-[700px] overflow-hidden rounded-xl rounded-b-lg bg-background pb-6 shadow-2xl backdrop-blur-2xl animate-in sm:rounded-2xl md:min-h-[500px] md:w-[900px] lg:w-[1000px]',
+                'min-h-[800px] overflow-hidden rounded-xl rounded-b-lg bg-background pb-6 shadow-2xl backdrop-blur-2xl animate-in sm:rounded-2xl md:min-h-[600px] md:w-[900px] lg:w-[1000px]',
               )}
             >
               <DialogTitle
@@ -138,7 +138,7 @@ export default function SubscriptionDialog({ open, onOpenChange }: TDialogProps)
                   <span className="sr-only">{localize('com_ui_close')}</span>
                 </button>
               </DialogTitle>
-              <div className="max-h-[650px] overflow-auto px-6 md:max-h-[500px] md:min-h-[500px] md:w-[900px] lg:w-[1000px]">
+              <div className="max-h-[750px] overflow-auto px-6 md:max-h-[600px] md:min-h-[600px] md:w-[900px] lg:w-[1000px]">
                 <Tabs.Root
                   value={activeTab}
                   onValueChange={handleTabChange}

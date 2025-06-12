@@ -53,8 +53,8 @@ export default function SubscriptionOverview() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-text-secondary">{localize('com_ui_loading')}</div>
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -129,24 +129,18 @@ export default function SubscriptionOverview() {
         <h3 className="mb-4 text-lg font-semibold text-text-primary">
           {localize('com_subscription_usage_summary')}
         </h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="text-center">
             <div className="text-2xl font-bold text-text-primary">
               {currentPlan?.usage?.messages || 0}
             </div>
-            <div className="text-sm text-text-secondary">{localize('com_subscription_messages_used')}</div>
+            <div className="text-sm text-text-secondary">{localize('com_subscription_messages_sent')}</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-text-primary">
-              {currentPlan?.usage?.tokens ? Math.round(currentPlan.usage.tokens / 1000) + 'K' : '0'}
+              {currentPlan?.usage?.activeChats || 0}
             </div>
-            <div className="text-sm text-text-secondary">{localize('com_subscription_tokens_used')}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-text-primary">
-              {currentPlan?.usage?.requests || 0}
-            </div>
-            <div className="text-sm text-text-secondary">{localize('com_subscription_requests_used')}</div>
+            <div className="text-sm text-text-secondary">{localize('com_subscription_active_chats')}</div>
           </div>
         </div>
       </div>

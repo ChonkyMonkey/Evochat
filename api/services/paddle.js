@@ -1,8 +1,8 @@
 const { logger } = require('@librechat/data-schemas');
 
 /**
- * Paddle API client for handling subscription billing
- * This is a placeholder implementation - needs to be replaced with actual Paddle SDK
+ * Paddle API client using the official Paddle Node.js SDK
+ * Uses the latest @paddle/paddle-node-sdk for modern API integration
  */
 class PaddleService {
   constructor() {
@@ -12,53 +12,37 @@ class PaddleService {
     
     if (!this.apiKey) {
       logger.warn('[PaddleService] PADDLE_API_KEY not configured - subscription features will not work');
+      this.paddle = null;
+      return;
     }
     
-    // Modern Paddle Billing API base URL
-    this.baseUrl = this.environment === 'production'
-      ? 'https://api.paddle.com'
-      : 'https://sandbox-api.paddle.com';
-      
-    // Default headers for Paddle API requests
-    this.headers = {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'Content-Type': 'application/json',
-    };
-      
-    logger.info(`[PaddleService] Initialized in ${this.environment} mode`);
-  }
-
-  /**
-   * Makes HTTP request to Paddle API
-   * @param {string} endpoint - API endpoint
-   * @param {Object} options - Request options
-   * @returns {Promise<Object>} API response
-   */
-  async makeRequest(endpoint, options = {}) {
     try {
-      const url = `${this.baseUrl}${endpoint}`;
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...this.headers,
-          ...options.headers,
-        },
+      // Initialize official Paddle SDK
+      const { Paddle, Environment, LogLevel } = require('@paddle/paddle-node-sdk');
+      
+      this.paddle = new Paddle(this.apiKey, {
+        environment: this.environment === 'production' ? Environment.production : Environment.sandbox,
+        logLevel: LogLevel.error, // Less verbose logging for production
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Paddle API error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-      }
-
-      return await response.json();
+      
+      logger.info(`[PaddleService] Initialized with official Paddle SDK in ${this.environment} mode`);
     } catch (error) {
-      logger.error(`[PaddleService] API request failed: ${endpoint}`, error);
-      throw error;
+      logger.error('[PaddleService] Failed to initialize Paddle SDK:', error);
+      logger.warn('[PaddleService] Make sure to install: npm install @paddle/paddle-node-sdk');
+      this.paddle = null;
     }
   }
 
   /**
-   * Creates a checkout session for a subscription
+   * Checks if Paddle SDK is available
+   * @returns {boolean} Whether SDK is properly initialized
+   */
+  isAvailable() {
+    return this.paddle !== null;
+  }
+
+  /**
+   * Creates a checkout session for a subscription using modern Paddle SDK
    * @param {Object} params - Checkout parameters
    * @param {string} params.planId - Internal plan ID
    * @param {string} params.userId - User ID
@@ -67,6 +51,10 @@ class PaddleService {
    */
   async createCheckoutSession({ planId, userId, customData = {} }) {
     try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
       logger.info(`[PaddleService] Creating checkout session for user ${userId}, plan ${planId}`);
       
       // Get plan details to get Paddle price ID
@@ -81,9 +69,8 @@ class PaddleService {
         throw new Error(`Plan ${plan.name} missing Paddle price ID`);
       }
 
-      // TODO: Replace with actual Paddle SDK implementation
-      // This is a placeholder implementation
-      const checkoutData = {
+      // Use official Paddle SDK to create transaction
+      const transactionRequest = {
         items: [
           {
             priceId: plan.paddlePriceId,
@@ -95,20 +82,23 @@ class PaddleService {
           planId,
           ...customData,
         },
-        customerEmail: customData.customerEmail,
         returnUrl: `${process.env.DOMAIN_CLIENT}/subscription/success`,
         discountUrl: `${process.env.DOMAIN_CLIENT}/subscription/cancel`,
       };
 
-      // Placeholder response - replace with actual Paddle API call
-      const mockResponse = {
-        checkoutUrl: `${this.baseUrl}/checkout?session_id=mock_session_${Date.now()}`,
-        sessionId: `session_${Date.now()}`,
-        customData: checkoutData.customData,
-      };
+      if (customData.customerEmail) {
+        transactionRequest.customerEmail = customData.customerEmail;
+      }
+
+      const transaction = await this.paddle.transactions.create(transactionRequest);
       
-      logger.info(`[PaddleService] Checkout session created: ${mockResponse.sessionId}`);
-      return mockResponse;
+      logger.info(`[PaddleService] Checkout session created: ${transaction.id}`);
+      
+      return {
+        checkoutUrl: transaction.checkoutUrl,
+        sessionId: transaction.id,
+        customData: transactionRequest.customData,
+      };
       
     } catch (error) {
       logger.error('[PaddleService] Error creating checkout session:', error);
@@ -117,27 +107,29 @@ class PaddleService {
   }
 
   /**
-   * Gets subscription details from Paddle
+   * Gets subscription details from Paddle using modern SDK
    * @param {string} subscriptionId - Paddle subscription ID
    * @returns {Promise<Object>} Subscription details
    */
   async getSubscription(subscriptionId) {
     try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
       logger.debug(`[PaddleService] Getting subscription ${subscriptionId}`);
       
-      // TODO: Replace with actual Paddle API call
-      // const response = await paddle.subscriptions.get(subscriptionId);
+      const subscription = await this.paddle.subscriptions.get(subscriptionId);
       
-      // Placeholder implementation
-      const mockSubscription = {
-        id: subscriptionId,
-        status: 'active',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        customData: {},
+      return {
+        id: subscription.id,
+        status: subscription.status,
+        currentPeriodStart: new Date(subscription.currentBillingPeriod?.startsAt),
+        currentPeriodEnd: new Date(subscription.currentBillingPeriod?.endsAt),
+        customData: subscription.customData || {},
+        items: subscription.items,
+        customer: subscription.customer,
       };
-      
-      return mockSubscription;
       
     } catch (error) {
       logger.error('[PaddleService] Error getting subscription:', error);
@@ -146,26 +138,30 @@ class PaddleService {
   }
 
   /**
-   * Updates a subscription
+   * Updates a subscription using modern SDK
    * @param {string} subscriptionId - Paddle subscription ID
    * @param {Object} updates - Update data
    * @returns {Promise<Object>} Updated subscription
    */
   async updateSubscription(subscriptionId, updates) {
     try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
       logger.info(`[PaddleService] Updating subscription ${subscriptionId}`);
       
-      // TODO: Replace with actual Paddle API call
-      // const response = await paddle.subscriptions.update(subscriptionId, updates);
+      const updatedSubscription = await this.paddle.subscriptions.update(subscriptionId, updates);
       
-      // Placeholder implementation
-      const updatedSubscription = {
-        id: subscriptionId,
-        ...updates,
+      return {
+        id: updatedSubscription.id,
+        status: updatedSubscription.status,
+        currentPeriodStart: new Date(updatedSubscription.currentBillingPeriod?.startsAt),
+        currentPeriodEnd: new Date(updatedSubscription.currentBillingPeriod?.endsAt),
+        customData: updatedSubscription.customData || {},
+        items: updatedSubscription.items,
         updatedAt: new Date(),
       };
-      
-      return updatedSubscription;
       
     } catch (error) {
       logger.error('[PaddleService] Error updating subscription:', error);
@@ -174,30 +170,33 @@ class PaddleService {
   }
 
   /**
-   * Cancels a subscription
+   * Cancels a subscription using modern SDK
    * @param {string} subscriptionId - Paddle subscription ID
    * @param {boolean} immediately - Whether to cancel immediately or at period end
    * @returns {Promise<Object>} Cancellation result
    */
   async cancelSubscription(subscriptionId, immediately = false) {
     try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
       logger.info(`[PaddleService] Canceling subscription ${subscriptionId}, immediately: ${immediately}`);
       
-      // TODO: Replace with actual Paddle API call
-      const cancelData = {
-        subscriptionId,
-        cancelAtPeriodEnd: !immediately,
+      const cancelRequest = {
+        effectiveFrom: immediately ? 'immediately' : 'next_billing_period',
       };
       
-      // Placeholder implementation
-      const result = {
+      const canceledSubscription = await this.paddle.subscriptions.cancel(subscriptionId, cancelRequest);
+      
+      return {
         success: true,
-        subscriptionId,
+        subscriptionId: canceledSubscription.id,
+        status: canceledSubscription.status,
         canceledAt: new Date(),
         cancelAtPeriodEnd: !immediately,
+        scheduledChange: canceledSubscription.scheduledChange,
       };
-      
-      return result;
       
     } catch (error) {
       logger.error('[PaddleService] Error canceling subscription:', error);
@@ -206,26 +205,28 @@ class PaddleService {
   }
 
   /**
-   * Gets customer details from Paddle
+   * Gets customer details from Paddle using modern SDK
    * @param {string} customerId - Paddle customer ID
    * @returns {Promise<Object>} Customer details
    */
   async getCustomer(customerId) {
     try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
       logger.debug(`[PaddleService] Getting customer ${customerId}`);
       
-      // TODO: Replace with actual Paddle API call
-      // const response = await paddle.customers.get(customerId);
+      const customer = await this.paddle.customers.get(customerId);
       
-      // Placeholder implementation
-      const mockCustomer = {
-        id: customerId,
-        email: 'user@example.com',
-        name: 'Test User',
-        createdAt: new Date(),
+      return {
+        id: customer.id,
+        email: customer.email,
+        name: customer.name,
+        createdAt: new Date(customer.createdAt),
+        updatedAt: new Date(customer.updatedAt),
+        customData: customer.customData || {},
       };
-      
-      return mockCustomer;
       
     } catch (error) {
       logger.error('[PaddleService] Error getting customer:', error);
@@ -234,7 +235,7 @@ class PaddleService {
   }
 
   /**
-   * Creates a customer in Paddle
+   * Creates a customer in Paddle using modern SDK
    * @param {Object} userData - User data
    * @param {string} userData.email - Customer email
    * @param {string} userData.name - Customer name
@@ -242,20 +243,27 @@ class PaddleService {
    */
   async createCustomer(userData) {
     try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
       logger.info(`[PaddleService] Creating customer for ${userData.email}`);
       
-      // TODO: Replace with actual Paddle API call
-      // const response = await paddle.customers.create(userData);
-      
-      // Placeholder implementation
-      const mockCustomer = {
-        id: `cust_${Date.now()}`,
+      const customerRequest = {
         email: userData.email,
         name: userData.name,
-        createdAt: new Date(),
       };
+
+      const customer = await this.paddle.customers.create(customerRequest);
       
-      return mockCustomer;
+      return {
+        id: customer.id,
+        email: customer.email,
+        name: customer.name,
+        createdAt: new Date(customer.createdAt),
+        updatedAt: new Date(customer.updatedAt),
+        customData: customer.customData || {},
+      };
       
     } catch (error) {
       logger.error('[PaddleService] Error creating customer:', error);
@@ -264,23 +272,26 @@ class PaddleService {
   }
 
   /**
-   * Syncs plans from Paddle to local database
+   * Syncs plans from Paddle to local database using modern SDK
    * @returns {Promise<Array>} Synced plans
    */
   async syncPlansFromPaddle() {
     try {
       logger.info('[PaddleService] Syncing plans from Paddle API...');
       
-      if (!this.apiKey) {
-        throw new Error('Paddle API key not configured');
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
       }
       
-      // Fetch products and prices from modern Paddle API
-      const productsResponse = await this.makeRequest('/products?status=active');
-      const pricesResponse = await this.makeRequest('/prices?status=active');
+      // Fetch products and prices using modern SDK
+      const productCollection = this.paddle.products.list({ status: ['active'] });
+      const priceCollection = this.paddle.prices.list({ status: ['active'] });
       
-      const products = productsResponse.data || [];
-      const prices = pricesResponse.data || [];
+      const productsPage = await productCollection.next();
+      const pricesPage = await priceCollection.next();
+      
+      const products = productsPage || [];
+      const prices = pricesPage || [];
       
       logger.debug(`[PaddleService] Fetched ${products.length} products and ${prices.length} prices from Paddle`);
       
@@ -290,7 +301,7 @@ class PaddleService {
       // Match products with their prices
       for (const product of products) {
         // Find prices for this product
-        const productPrices = prices.filter(price => price.product_id === product.id);
+        const productPrices = prices.filter(price => price.productId === product.id);
         
         if (productPrices.length === 0) {
           logger.warn(`[PaddleService] No prices found for product: ${product.name}`);
@@ -313,8 +324,8 @@ class PaddleService {
           // Update existing plan with latest pricing
           const { updatePlan } = require('~/models/Plan');
           await updatePlan(existingPlan._id, {
-            price: parseInt(price.unit_amount),
-            currency: price.currency_code,
+            price: parseInt(price.unitPrice.amount),
+            currency: price.unitPrice.currencyCode,
             paddlePriceId: price.id,
           });
           syncedPlans.push(existingPlan);
@@ -461,33 +472,84 @@ class PaddleService {
   }
 
   /**
-   * Verifies a webhook signature
+   * Verifies and unmarshals a webhook using modern SDK
+   * @param {string} rawBody - Raw webhook body
+   * @param {string} signature - Webhook signature
+   * @returns {Promise<Object|null>} Webhook event data or null if invalid
+   */
+  async verifyAndUnmarshalWebhook(rawBody, signature) {
+    try {
+      if (!this.isAvailable()) {
+        logger.warn('[PaddleService] Paddle SDK not available - cannot verify webhook');
+        return null;
+      }
+
+      if (!this.webhookSecret) {
+        logger.warn('[PaddleService] No webhook secret configured - cannot verify signature');
+        return null;
+      }
+      
+      // Use official Paddle SDK for webhook verification and unmarshaling
+      const eventData = await this.paddle.webhooks.unmarshal(rawBody, this.webhookSecret, signature);
+      
+      logger.debug('[PaddleService] Webhook signature verified successfully');
+      return eventData;
+      
+    } catch (error) {
+      logger.error('[PaddleService] Error verifying webhook signature:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Creates a customer portal session URL using modern SDK
+   * @param {string} customerId - Paddle customer ID
+   * @param {string} returnUrl - URL to redirect after portal session
+   * @returns {Promise<string>} Customer portal URL
+   */
+  async createCustomerPortalSession(customerId, returnUrl = null) {
+    try {
+      if (!this.isAvailable()) {
+        throw new Error('Paddle SDK not available');
+      }
+
+      logger.debug(`[PaddleService] Creating customer portal session for ${customerId}`);
+      
+      const portalRequest = {
+        customerId,
+      };
+
+      if (returnUrl) {
+        portalRequest.returnUrl = returnUrl;
+      }
+
+      const portalSession = await this.paddle.customerPortal.create(portalRequest);
+      
+      logger.info(`[PaddleService] Customer portal session created for ${customerId}`);
+      
+      return portalSession.url;
+      
+    } catch (error) {
+      logger.error('[PaddleService] Error creating customer portal session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy method for backward compatibility
    * @param {string} rawBody - Raw webhook body
    * @param {string} signature - Webhook signature
    * @returns {boolean} Whether signature is valid
    */
   verifyWebhookSignature(rawBody, signature) {
-    try {
-      if (!this.webhookSecret) {
-        logger.warn('[PaddleService] No webhook secret configured - cannot verify signature');
-        return false;
-      }
-      
-      // TODO: Implement actual Paddle webhook signature verification
-      // This is typically done with HMAC-SHA256
-      
-      // Placeholder implementation - always return true for development
-      logger.debug('[PaddleService] Webhook signature verification (placeholder)');
-      return true;
-      
-    } catch (error) {
-      logger.error('[PaddleService] Error verifying webhook signature:', error);
-      return false;
-    }
+    // For backward compatibility, return true if verification succeeds
+    return this.verifyAndUnmarshalWebhook(rawBody, signature)
+      .then(eventData => eventData !== null)
+      .catch(() => false);
   }
 
   /**
-   * Validates configuration
+   * Validates configuration and SDK availability
    * @returns {Object} Configuration status
    */
   validateConfiguration() {
@@ -495,12 +557,24 @@ class PaddleService {
     
     if (!this.apiKey) issues.push('Missing PADDLE_API_KEY');
     if (!this.webhookSecret) issues.push('Missing PADDLE_WEBHOOK_SECRET');
+    if (!this.isAvailable()) issues.push('Paddle SDK not properly initialized');
     
-    return {
+    const config = {
       isValid: issues.length === 0,
       issues,
       environment: this.environment,
+      sdkVersion: '@paddle/paddle-node-sdk v1.0.0',
+      capabilities: {
+        transactions: this.isAvailable(),
+        subscriptions: this.isAvailable(),
+        customers: this.isAvailable(),
+        webhooks: this.isAvailable() && !!this.webhookSecret,
+        customerPortal: this.isAvailable(),
+      }
     };
+    
+    logger.debug('[PaddleService] Configuration validation:', config);
+    return config;
   }
 }
 

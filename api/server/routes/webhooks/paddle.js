@@ -21,25 +21,18 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
     
     logger.info('[PaddleWebhook] Received webhook event');
     
-    // Verify webhook signature
+    // Verify webhook signature and unmarshal using modern SDK
     const paddleService = getPaddleService();
-    const isValidSignature = paddleService.verifyWebhookSignature(rawBody, signature);
+    const rawBodyString = typeof rawBody === 'string' ? rawBody : rawBody.toString();
     
-    if (!isValidSignature) {
-      logger.warn('[PaddleWebhook] Invalid webhook signature');
+    const eventData = await paddleService.verifyAndUnmarshalWebhook(rawBodyString, signature);
+    
+    if (!eventData) {
+      logger.warn('[PaddleWebhook] Invalid webhook signature or verification failed');
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
-    // Parse the webhook payload
-    let eventData;
-    try {
-      eventData = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-    } catch (error) {
-      logger.error('[PaddleWebhook] Failed to parse webhook payload:', error);
-      return res.status(400).json({ error: 'Invalid JSON payload' });
-    }
-    
-    const { event_type: eventType, data } = eventData;
+    const { eventType, data } = eventData;
     
     logger.info(`[PaddleWebhook] Processing event: ${eventType}`);
     
