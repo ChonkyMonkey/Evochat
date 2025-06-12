@@ -15,3 +15,4 @@ export * from './assistant';
 export * from './file';
 /* Memories */
 export * from './memory';
+export * from './subscription';

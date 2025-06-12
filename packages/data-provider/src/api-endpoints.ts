@@ -289,3 +289,16 @@ export const verifyTwoFactorTemp = () => '/api/auth/2fa/verify-temp';
 export const memories = () => '/api/memories';
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
 export const memoryPreferences = () => `${memories()}/preferences`;
+
+// Subscription Endpoints
+export const subscription = () => '/api/subscription';
+export const subscriptionPlans = () => '/api/subscription/plans';
+export const subscriptionStatus = () => '/api/subscription/status';
+export const subscriptionUsage = (period?: string) =>
+  `/api/subscription/usage${period ? `?period=${period}` : ''}`;
+export const subscriptionCheckout = () => '/api/subscription/checkout';
+export const subscriptionCancel = () => '/api/subscription/cancel';
+export const subscriptionUpdate = () => '/api/subscription/update';
+export const subscriptionResume = () => '/api/subscription/resume';
+export const subscriptionHistory = () => '/api/subscription/history';
+

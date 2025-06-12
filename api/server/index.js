@@ -41,6 +41,19 @@ const startServer = async () => {
   logger.info('Connected to MongoDB');
   await indexSync();
 
+  // Auto-initialize subscription system if in subscription mode
+  if (process.env.BILLING_MODE === 'subscription') {
+    try {
+      const { seedDefaultPlans } = require('~/models/Plan');
+      await seedDefaultPlans();
+      logger.info('Subscription system initialized');
+    } catch (error) {
+      logger.warn('Subscription system initialization failed:', error.message);
+      logger.info('LibreChat will continue without subscription features');
+      // Don't throw error - let the app continue without subscription features
+    }
+  }
+
   app.disable('x-powered-by');
   app.set('trust proxy', trusted_proxy);
 
@@ -119,6 +132,11 @@ const startServer = async () => {
   app.use('/api/bedrock', routes.bedrock);
   app.use('/api/memories', routes.memories);
   app.use('/api/tags', routes.tags);
+  
+  // Subscription and billing routes
+  app.use('/api/subscription', routes.subscription);
+  app.use('/api/usage', routes.usage);
+  app.use('/api/webhooks/paddle', routes.paddleWebhook);
 
   app.use((req, res) => {
     res.set({

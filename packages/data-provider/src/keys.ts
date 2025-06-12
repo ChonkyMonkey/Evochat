@@ -46,8 +46,15 @@ export enum QueryKeys {
   health = 'health',
   userTerms = 'userTerms',
   banner = 'banner',
+
   /* Memories */
   memories = 'memories',
+
+  subscription = 'subscription',
+  subscriptionPlans = 'subscriptionPlans',
+  subscriptionStatus = 'subscriptionStatus',
+  subscriptionUsage = 'subscriptionUsage',
+  subscriptionHistory = 'subscriptionHistory',
 }
 
 export enum MutationKeys {

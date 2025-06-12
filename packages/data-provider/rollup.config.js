@@ -6,9 +6,16 @@ import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
 import generatePackageJson from 'rollup-plugin-generate-package-json';
+import alias from '@rollup/plugin-alias';
+import path from 'path';
 
 const plugins = [
   peerDepsExternal(),
+  alias({
+    entries: [
+      { find: /^~\/(.*)/, replacement: path.resolve('../data-schemas/src', '$1') }
+    ]
+  }),
   resolve(),
   replace({
     __IS_DEV__: process.env.NODE_ENV === 'development',

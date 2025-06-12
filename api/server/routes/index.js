@@ -27,6 +27,9 @@ const edit = require('./edit');
 const keys = require('./keys');
 const user = require('./user');
 const ask = require('./ask');
+const subscription = require('./subscription');
+const usage = require('./usage');
+const paddleWebhook = require('./webhooks/paddle');
 
 module.exports = {
   ask,
@@ -58,4 +61,7 @@ module.exports = {
   assistants,
   categories,
   staticRoute,
+  subscription,
+  usage,
+  paddleWebhook,
 };
