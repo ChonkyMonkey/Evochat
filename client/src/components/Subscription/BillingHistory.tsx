@@ -1,13 +1,13 @@
 import React from 'react';
 import { useLocalize } from '~/hooks';
-import { useGetSubscriptionQuery } from 'librechat-data-provider/react-query';
+import { useGetUserSubscription } from 'librechat-data-provider/react-query';
 import { usePaddle } from '~/contexts/PaddleProvider';
 import { Button } from '~/components/ui';
 
 const BillingHistory: React.FC = () => {
   const localize = useLocalize();
   const { paddle, isLoaded } = usePaddle();
-  const { data: subscription, isLoading } = useGetSubscriptionQuery();
+  const { data: subscription, isLoading } = useGetUserSubscription();
 
   const handleOpenCustomerPortal = () => {
     if (!paddle || !subscription?.paddleCustomerId) {

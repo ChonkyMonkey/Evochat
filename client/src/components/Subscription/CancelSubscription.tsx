@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocalize } from '~/hooks';
 import { usePaddle } from '~/contexts/PaddleProvider';
-import { useGetSubscriptionQuery } from 'librechat-data-provider/react-query';
+import { useGetUserSubscription } from 'librechat-data-provider/react-query';
 import { Button } from '~/components/ui';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -12,7 +12,7 @@ interface CancelSubscriptionProps {
 const CancelSubscription: React.FC<CancelSubscriptionProps> = ({ onClose }) => {
   const localize = useLocalize();
   const { paddle } = usePaddle();
-  const { data: subscription } = useGetSubscriptionQuery();
+  const { data: subscription } = useGetUserSubscription();
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
