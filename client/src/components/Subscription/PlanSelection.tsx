@@ -73,7 +73,17 @@ export default function PlanSelection() {
   const { data: backendPlans, isLoading: plansLoading } = useGetAvailablePlans();
   
   // Use backend plans if available, otherwise fallback to hardcoded plans
-  const plans = backendPlans || fallbackPlans;
+  // Ensure plans is always an array to prevent "map is not a function" errors
+  const rawPlans = backendPlans;
+  const plans = Array.isArray(rawPlans) ? rawPlans : fallbackPlans;
+
+  // Debug logging to help identify the issue
+  console.log('PlanSelection Debug:', {
+    backendPlans: rawPlans,
+    isBackendPlansArray: Array.isArray(rawPlans),
+    plans,
+    isPlansArray: Array.isArray(plans)
+  });
   
   if (plansLoading) {
     return (
@@ -154,7 +164,7 @@ export default function PlanSelection() {
             </div>
 
             <div className="mt-6 space-y-3">
-              {plan.features.map((feature, index) => {
+              {Array.isArray(plan.features) && plan.features.map((feature, index) => {
                 const isHighlighted = feature.text.includes('Unlimitted messages') ||
                                     feature.text.includes('Premium support') ||
                                     feature.text.includes('Advanced AI models');

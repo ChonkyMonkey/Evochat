@@ -14,6 +14,15 @@ export default function SubscriptionOverview() {
 
   const currentPlan = subscriptionData || subscription;
 
+  // Debug logging to help identify the issue
+  console.log('SubscriptionOverview Debug:', {
+    subscription,
+    subscriptionData,
+    currentPlan,
+    currentPlanFeatures: currentPlan?.features,
+    isFeaturesArray: Array.isArray(currentPlan?.features)
+  });
+
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'active':
@@ -108,7 +117,7 @@ export default function SubscriptionOverview() {
       </div>
 
       {/* Plan Features */}
-      {currentPlan?.features && (
+      {currentPlan?.features && Array.isArray(currentPlan.features) && (
         <div className="rounded-lg border border-border-medium bg-surface-primary p-6">
           <h3 className="mb-4 text-lg font-semibold text-text-primary">
             {localize('com_subscription_plan_features')}

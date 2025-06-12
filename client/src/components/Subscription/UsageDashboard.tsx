@@ -94,11 +94,22 @@ export default function UsageDashboard() {
   const usagePercentage = messageLimit > 0 ? Math.min((messagesUsed / messageLimit) * 100, 100) : 0;
 
   // Model usage data from actual usage tracking
-  const modelUsage = usage.modelUsage || [
+  // Ensure modelUsage is always an array to prevent "map is not a function" errors
+  const rawModelUsage = usage.modelUsage;
+  const modelUsage = Array.isArray(rawModelUsage) ? rawModelUsage : [
     { model: 'GPT-4', percentage: messagesUsed > 0 ? 55 : 0, messageCount: Math.round(messagesUsed * 0.55), color: '#10b981' },
     { model: 'Claude', percentage: messagesUsed > 0 ? 30 : 0, messageCount: Math.round(messagesUsed * 0.30), color: '#3b82f6' },
     { model: 'Gemini', percentage: messagesUsed > 0 ? 15 : 0, messageCount: Math.round(messagesUsed * 0.15), color: '#8b5cf6' },
   ];
+
+  // Debug logging to help identify the issue
+  console.log('UsageDashboard Debug:', {
+    usage,
+    rawModelUsage,
+    isRawModelUsageArray: Array.isArray(rawModelUsage),
+    modelUsage,
+    isModelUsageArray: Array.isArray(modelUsage)
+  });
 
   // Calculate active chats from actual data
   const activeChats = usage.activeChats || 0;
@@ -122,7 +133,7 @@ export default function UsageDashboard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTipIndex((prev) => (prev + 1) % tips.length);
-    }, 10000); // Change tip every 10 seconds
+    }, 30000); // Change tip every 30 seconds
 
     return () => clearInterval(interval);
   }, [tips.length]);
