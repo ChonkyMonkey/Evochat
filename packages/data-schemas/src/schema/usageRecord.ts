@@ -71,11 +71,11 @@ usageRecordSchema.methods.addUsage = function (model: string, tokenCost: number,
 
 usageRecordSchema.methods.getTopModels = function (limit = 5) {
   const record = this as any;
-  const modelUsageArray = Array.from(record.modelUsage.entries());
+  const modelUsageArray = Array.from(record.modelUsage.entries()) as [string, number][];
   return modelUsageArray
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
     .slice(0, limit)
-    .map(([model, usage]) => ({ model, usage }));
+    .map(([model, usage]: [string, number]) => ({ model, usage }));
 };
 
 // Static methods for aggregation
