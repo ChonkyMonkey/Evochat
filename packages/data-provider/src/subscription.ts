@@ -38,7 +38,9 @@ export const getAvailablePlans = async (): Promise<IPlan[]> => {
     throw new Error(`Failed to get plans: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  // Backend returns {success: true, plans: [...]} but we need just the plans array
+  return data.plans || data;
 };
 
 export const getSubscriptionStatus = async (): Promise<SubscriptionStatus | null> => {

@@ -67,13 +67,19 @@ const fallbackPlans: Plan[] = [
 
 export default function PlanSelection() {
   const localize = useLocalize();
-  const { openCheckout } = usePaddleCheckout();
+  const { openCheckout, isLoaded, error } = usePaddleCheckout();
   const { data: backendPlans, isLoading: plansLoading } = useGetAvailablePlans();
+  
+  // Debug logging for subscription page diagnostics
+  console.log('[PlanSelection] Backend plans data:', backendPlans);
+  console.log('[PlanSelection] Paddle loaded:', isLoaded, 'Error:', error);
   
   // Use backend plans if available, otherwise fallback to hardcoded plans
   // Ensure plans is always an array to prevent "map is not a function" errors
   const rawPlans = backendPlans;
   const plans = Array.isArray(rawPlans) ? rawPlans : fallbackPlans;
+  
+  console.log('[PlanSelection] Final plans to render:', plans);
   
   if (plansLoading) {
     return (
@@ -84,23 +90,44 @@ export default function PlanSelection() {
   }
 
   const handleSelectPlan = async (plan: Plan) => {
+    console.log('[PlanSelection] Select plan button clicked:', plan);
+    console.log('[PlanSelection] Paddle status - isLoaded:', isLoaded, 'error:', error);
+    
+    if (!isLoaded) {
+      console.error('[PlanSelection] Paddle is not loaded yet');
+      alert('Payment system is still loading. Please wait a moment and try again.');
+      return;
+    }
+    
+    if (error) {
+      console.error('[PlanSelection] Paddle has an error:', error);
+      alert('Payment system error: ' + error);
+      return;
+    }
 
-    if (plan.paddleProductId) {
-      try {
-        await openCheckout({
-          items: [{ priceId: plan.paddleProductId, quantity: 1 }],
-          onSuccess: (data) => {
-            console.log('Subscription successful:', data);
-            // Handle successful subscription
-          },
-          onError: (error) => {
-            console.error('Subscription failed:', error);
-            // Handle subscription error
-          },
-        });
-      } catch (error) {
-        console.error('Failed to open checkout:', error);
-      }
+    if (!plan.paddleProductId) {
+      console.error('[PlanSelection] Plan missing paddleProductId:', plan);
+      alert('This plan is not properly configured. Please contact support.');
+      return;
+    }
+
+    console.log('[PlanSelection] Opening checkout with paddleProductId:', plan.paddleProductId);
+
+    try {
+      await openCheckout({
+        items: [{ priceId: plan.paddleProductId, quantity: 1 }],
+        onSuccess: (data) => {
+          console.log('[PlanSelection] Subscription successful:', data);
+          // Handle successful subscription
+        },
+        onError: (error) => {
+          console.error('[PlanSelection] Subscription failed:', error);
+          alert('Subscription failed: ' + (error?.message || error));
+        },
+      });
+    } catch (error) {
+      console.error('[PlanSelection] Failed to open checkout:', error);
+      alert('Failed to open payment form: ' + (error?.message || error));
     }
   };
 
