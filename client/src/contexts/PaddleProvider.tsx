@@ -41,7 +41,9 @@ export const PaddleProvider: React.FC<PaddleProviderProps> = ({ children }) => {
         console.log('[PaddleProvider] VITE_PADDLE_ENVIRONMENT:', paddleEnvironment);
         console.log('[PaddleProvider] VITE_PADDLE_CLIENT_TOKEN present:', !!paddleToken);
         console.log('[PaddleProvider] VITE_PADDLE_CLIENT_TOKEN length:', paddleToken?.length || 0);
+        console.log('[PaddleProvider] VITE_PADDLE_CLIENT_TOKEN value (first 10 chars):', paddleToken?.substring(0, 10) + '...');
         console.log('[PaddleProvider] All import.meta.env keys:', Object.keys(import.meta.env));
+        console.log('[PaddleProvider] All import.meta.env values:', import.meta.env);
 
         if (!paddleToken) {
           const errorMsg = 'Paddle client token is not configured. Expected VITE_PADDLE_CLIENT_TOKEN environment variable.';
