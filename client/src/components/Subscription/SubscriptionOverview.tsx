@@ -14,15 +14,6 @@ export default function SubscriptionOverview() {
 
   const currentPlan = subscriptionData || subscription;
 
-  // Debug logging to help identify the issue
-  console.log('SubscriptionOverview Debug:', {
-    subscription,
-    subscriptionData,
-    currentPlan,
-    currentPlanFeatures: currentPlan?.features,
-    isFeaturesArray: Array.isArray(currentPlan?.features)
-  });
-
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'active':

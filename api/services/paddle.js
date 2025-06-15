@@ -11,10 +11,15 @@ class PaddleService {
     this.webhookSecret = process.env.PADDLE_WEBHOOK_SECRET;
     
     if (!this.apiKey) {
+      console.log('⚠️  [PADDLE SERVICE] PADDLE_API_KEY not configured - subscription features will not work');
       logger.warn('[PaddleService] PADDLE_API_KEY not configured - subscription features will not work');
       this.paddle = null;
       return;
     }
+    
+    console.log('🔧 [PADDLE SERVICE] Initializing with API key (configured)');
+    console.log(`🌍 [PADDLE SERVICE] Environment: ${this.environment}`);
+    console.log(`🔐 [PADDLE SERVICE] Webhook secret: ${this.webhookSecret ? 'configured' : 'MISSING'}`);
     
     try {
       // Initialize official Paddle SDK
@@ -25,8 +30,10 @@ class PaddleService {
         logLevel: LogLevel.error, // Less verbose logging for production
       });
       
+      console.log('✅ [PADDLE SERVICE] SDK initialized successfully');
       logger.info(`[PaddleService] Initialized with official Paddle SDK in ${this.environment} mode`);
     } catch (error) {
+      console.log('❌ [PADDLE SERVICE] Failed to initialize SDK:', error.message);
       logger.error('[PaddleService] Failed to initialize Paddle SDK:', error);
       logger.warn('[PaddleService] Make sure to install: npm install @paddle/paddle-node-sdk');
       this.paddle = null;

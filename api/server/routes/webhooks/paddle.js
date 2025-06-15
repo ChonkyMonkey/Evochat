@@ -19,6 +19,10 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
     const signature = req.get('Paddle-Signature');
     const rawBody = req.body;
     
+    console.log('🔔 [PADDLE WEBHOOK] Received webhook event');
+    console.log('📋 [PADDLE WEBHOOK] Headers:', req.headers);
+    console.log('🔐 [PADDLE WEBHOOK] Signature present:', !!signature);
+    
     logger.info('[PaddleWebhook] Received webhook event');
     
     // Verify webhook signature and unmarshal using modern SDK
@@ -28,11 +32,16 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
     const eventData = await paddleService.verifyAndUnmarshalWebhook(rawBodyString, signature);
     
     if (!eventData) {
+      console.log('❌ [PADDLE WEBHOOK] Signature verification FAILED');
+      console.log('🔧 [PADDLE WEBHOOK] Check PADDLE_WEBHOOK_SECRET environment variable');
       logger.warn('[PaddleWebhook] Invalid webhook signature or verification failed');
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
     const { eventType, data } = eventData;
+    
+    console.log(`✅ [PADDLE WEBHOOK] Processing event: ${eventType}`);
+    console.log(`📦 [PADDLE WEBHOOK] Event data:`, JSON.stringify(data, null, 2));
     
     logger.info(`[PaddleWebhook] Processing event: ${eventType}`);
     
@@ -84,6 +93,8 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
     res.status(200).json({ received: true });
     
   } catch (error) {
+    console.log('💥 [PADDLE WEBHOOK] ERROR processing webhook:', error.message);
+    console.log('🔍 [PADDLE WEBHOOK] Full error:', error);
     logger.error('[PaddleWebhook] Error processing webhook:', error);
     
     // Return 500 to signal Paddle to retry
@@ -96,6 +107,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
  */
 async function handleSubscriptionCreated(data) {
   try {
+    console.log(`🆕 [PADDLE WEBHOOK] Creating subscription: ${data.id}`);
     logger.info(`[PaddleWebhook] Handling subscription created: ${data.id}`);
     
     const {
@@ -149,6 +161,8 @@ async function handleSubscriptionCreated(data) {
  */
 async function handleSubscriptionUpdated(data) {
   try {
+    console.log(`🔄 [PADDLE WEBHOOK] Updating subscription: ${data.id}`);
+    console.log(`📊 [PADDLE WEBHOOK] New status: ${data.status}`);
     logger.info(`[PaddleWebhook] Handling subscription updated: ${data.id}`);
     
     const {

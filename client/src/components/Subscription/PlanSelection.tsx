@@ -43,7 +43,7 @@ const fallbackPlans: Plan[] = [
       { text: 'com_subscription_feature_basic_support', included: true },
       { text: 'com_subscription_feature_and_more', included: true },
     ],
-    paddleProductId: 'pro_monthly',
+    paddleProductId: 'pro_01jxfdbj5c3kwdq8w2phs9jey0',
   },
   {
     id: 'pro',
@@ -54,16 +54,14 @@ const fallbackPlans: Plan[] = [
     features: [
       { text: 'com_subscription_feature_unlimited_messages', included: true },
       { text: 'com_subscription_feature_all_models', included: true },
-      { text: 'com_subscription_feature_file_uploads', included: true },
       { text: 'com_subscription_feature_image_generation', included: true },
       { text: 'com_subscription_feature_ai_search', included: true },
       { text: 'com_subscription_feature_agent_builder', included: true },
-      { text: 'com_subscription_feature_rag_capabilities', included: true },
       { text: 'com_subscription_feature_prompt_templates', included: true },
       { text: 'com_subscription_feature_premium_support', included: true },
       { text: 'com_subscription_feature_and_more', included: true },
     ],
-    paddleProductId: 'team_monthly',
+    paddleProductId: 'pro_01jxfdd0eh5r7tq409g29c0562',
   },
 ];
 
@@ -76,14 +74,6 @@ export default function PlanSelection() {
   // Ensure plans is always an array to prevent "map is not a function" errors
   const rawPlans = backendPlans;
   const plans = Array.isArray(rawPlans) ? rawPlans : fallbackPlans;
-
-  // Debug logging to help identify the issue
-  console.log('PlanSelection Debug:', {
-    backendPlans: rawPlans,
-    isBackendPlansArray: Array.isArray(rawPlans),
-    plans,
-    isPlansArray: Array.isArray(plans)
-  });
   
   if (plansLoading) {
     return (

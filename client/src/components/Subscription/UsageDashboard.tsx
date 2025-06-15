@@ -81,7 +81,7 @@ export default function UsageDashboard() {
   const subscription = useRecoilValue(subscriptionStore.subscription);
   const usageData = useRecoilValue(subscriptionStore.usageData);
   const { data: subscriptionData, isLoading: subscriptionLoading } = useGetUserSubscription();
-  const { data: usageDataFromQuery, isLoading: usageLoading } = useGetUsageData('current');
+  const { data: usageDataFromQuery, isLoading: usageLoading, error: usageError } = useGetUsageData('current');
   
   const isLoading = subscriptionLoading || usageLoading;
 
@@ -101,15 +101,6 @@ export default function UsageDashboard() {
     { model: 'Claude', percentage: messagesUsed > 0 ? 30 : 0, messageCount: Math.round(messagesUsed * 0.30), color: '#3b82f6' },
     { model: 'Gemini', percentage: messagesUsed > 0 ? 15 : 0, messageCount: Math.round(messagesUsed * 0.15), color: '#8b5cf6' },
   ];
-
-  // Debug logging to help identify the issue
-  console.log('UsageDashboard Debug:', {
-    usage,
-    rawModelUsage,
-    isRawModelUsageArray: Array.isArray(rawModelUsage),
-    modelUsage,
-    isModelUsageArray: Array.isArray(modelUsage)
-  });
 
   // Calculate active chats from actual data
   const activeChats = usage.activeChats || 0;
