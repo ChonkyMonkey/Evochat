@@ -168,13 +168,19 @@ export default function PlanSelection() {
 
             <div className="mt-6 space-y-3">
               {Array.isArray(plan.features) && plan.features.map((feature, index) => {
-                const isHighlighted = feature.text.includes('Unlimitted messages') ||
-                                    feature.text.includes('Premium support') ||
-                                    feature.text.includes('Advanced AI models');
+                // Handle both string[] and PlanFeature[] formats
+                const featureText = typeof feature === 'string' ? feature : feature?.text;
+                const featureIncluded = typeof feature === 'string' ? true : feature?.included ?? true;
+                
+                // Safe includes check
+                const safeFeatureText = featureText || '';
+                const isHighlighted = safeFeatureText.includes('Unlimitted messages') ||
+                                    safeFeatureText.includes('Premium support') ||
+                                    safeFeatureText.includes('Advanced AI models');
                 
                 return (
                   <div key={index} className="flex items-start gap-3">
-                    {feature.included ? (
+                    {featureIncluded ? (
                       <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                     ) : (
                       <div className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -182,13 +188,13 @@ export default function PlanSelection() {
                     <span
                       className={cn(
                         'text-sm',
-                        feature.included
+                        featureIncluded
                           ? 'text-text-primary'
                           : 'text-text-secondary line-through',
-                        isHighlighted && feature.included && 'font-bold'
+                        isHighlighted && featureIncluded && 'font-bold'
                       )}
                     >
-                      {localize(feature.text)}
+                      {localize(featureText)}
                     </span>
                   </div>
                 );
@@ -196,7 +202,11 @@ export default function PlanSelection() {
             </div>
 
             {/* Message count disclaimer for plans with message limits */}
-            {plan.features.some(f => localize(f.text).includes('*')) && (
+            {Array.isArray(plan.features) && plan.features.some(f => {
+              const featureText = typeof f === 'string' ? f : f?.text;
+              const localizedText = localize(featureText) || '';
+              return localizedText.includes('*');
+            }) && (
               <div className="mt-4 text-xs text-text-secondary bg-surface-secondary rounded p-2">
                 {localize('com_subscription_message_count_disclaimer')}
               </div>

@@ -1,4 +1,5 @@
 import * as endpoints from './api-endpoints';
+import request from './request';
 import type {
   ISubscription,
   IPlan,
@@ -7,154 +8,121 @@ import type {
   SubscriptionCheckoutData
 } from '../../../packages/data-schemas/src/types/subscription';
 
-// Subscription API functions
+// Subscription API functions using authenticated request helper
 export const getCurrentSubscription = async (): Promise<ISubscription | null> => {
-  const response = await fetch('/api/subscription', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
+  try {
+    const data = await request.get<any>('/api/subscription/current');
+    return data.subscription || null;
+  } catch (error: any) {
+    if (error.response?.status === 404) {
       return null; // No subscription found
     }
-    throw new Error(`Failed to get subscription: ${response.statusText}`);
+    throw new Error(`Failed to get subscription: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const getAvailablePlans = async (): Promise<IPlan[]> => {
-  const response = await fetch('/api/subscription/plans', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to get plans: ${response.statusText}`);
+  try {
+    const data = await request.get<any>('/api/subscription/plans');
+    // Backend returns {success: true, plans: [...]} but we need just the plans array
+    return data.plans || data;
+  } catch (error: any) {
+    throw new Error(`Failed to get plans: ${error.message}`);
   }
-
-  const data = await response.json();
-  // Backend returns {success: true, plans: [...]} but we need just the plans array
-  return data.plans || data;
 };
 
 export const getSubscriptionStatus = async (): Promise<SubscriptionStatus | null> => {
-  const response = await fetch('/api/subscription/status', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
+  try {
+    const data = await request.get<any>('/api/subscription/current');
+    if (!data || !data.hasActiveSubscription) {
+      return null;
+    }
+    return {
+      isActive: data.isActive,
+      isExpired: data.isExpired,
+      remainingDays: data.remainingDays,
+      currentUsage: data.usage || { tokensUsed: 0, requestCount: 0, percentage: 0 },
+      plan: data.plan
+    };
+  } catch (error: any) {
+    if (error.response?.status === 404) {
       return null; // No subscription found
     }
-    throw new Error(`Failed to get subscription status: ${response.statusText}`);
+    throw new Error(`Failed to get subscription status: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const getUsageData = async (period?: 'current' | 'last_month'): Promise<UsageSummary> => {
-  const periodParam = period ? `?period=${period}` : '';
-  const response = await fetch(`/api/subscription/usage${periodParam}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to get usage data: ${response.statusText}`);
+  try {
+    const endpoint = period ? `/api/subscription/usage?period=${period}` : '/api/subscription/usage';
+    const data = await request.get<any>(endpoint);
+    
+    // Transform backend response to match frontend interface
+    return {
+      totalTokensUsed: data.usage?.tokensUsed || 0,
+      totalRequests: data.usage?.messages || 0,
+      modelBreakdown: data.usage?.modelUsage?.map((model: any) => ({
+        model: model.model,
+        tokensUsed: model.tokenUsage || 0,
+        percentage: model.percentage || 0,
+      })) || [],
+      dailyAverage: Math.round((data.usage?.messages || 0) / 30),
+      weeklyTrend: [], // Backend doesn't provide this yet
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to get usage data: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const createCheckoutSession = async (planId: string): Promise<SubscriptionCheckoutData> => {
-  const response = await fetch('/api/subscription/checkout', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ planId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create checkout session: ${response.statusText}`);
+  try {
+    const data = await request.post('/api/subscription/checkout', { planId });
+    return {
+      planId,
+      userId: '', // Backend doesn't return this
+      checkoutUrl: data.checkoutUrl,
+      sessionId: data.sessionId,
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to create checkout session: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const cancelSubscription = async (subscriptionId: string): Promise<{ success: boolean; message: string }> => {
-  const response = await fetch('/api/subscription/cancel', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to cancel subscription: ${response.statusText}`);
+  try {
+    const data = await request.post('/api/subscription/cancel', { subscriptionId });
+    return {
+      success: data.success,
+      message: data.message,
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to cancel subscription: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const updateSubscription = async (
-  subscriptionId: string, 
+  subscriptionId: string,
   planId: string
 ): Promise<ISubscription> => {
-  const response = await fetch('/api/subscription/update', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId, planId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update subscription: ${response.statusText}`);
+  try {
+    return await request.put('/api/subscription/update', { subscriptionId, planId });
+  } catch (error: any) {
+    throw new Error(`Failed to update subscription: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const resumeSubscription = async (subscriptionId: string): Promise<ISubscription> => {
-  const response = await fetch('/api/subscription/resume', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to resume subscription: ${response.statusText}`);
+  try {
+    return await request.post('/api/subscription/resume', { subscriptionId });
+  } catch (error: any) {
+    throw new Error(`Failed to resume subscription: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const getSubscriptionHistory = async (): Promise<ISubscription[]> => {
-  const response = await fetch('/api/subscription/history', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to get subscription history: ${response.statusText}`);
+  try {
+    return await request.get<ISubscription[]>('/api/subscription/history');
+  } catch (error: any) {
+    throw new Error(`Failed to get subscription history: ${error.message}`);
   }
-
-  return response.json();
 };
