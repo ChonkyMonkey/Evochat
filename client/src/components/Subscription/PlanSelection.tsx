@@ -2,8 +2,7 @@ import React from 'react';
 import { Check, Star, Zap } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { Button } from '~/components/ui';
-import { usePaddleCheckout } from '~/contexts/PaddleProvider';
-import { useGetAvailablePlans } from '~/data-provider';
+import { useGetAvailablePlans, useCreateCheckout } from '~/data-provider';
 import { cn } from '~/utils';
 
 interface PlanFeature {
@@ -67,12 +66,11 @@ const fallbackPlans: Plan[] = [
 
 export default function PlanSelection() {
   const localize = useLocalize();
-  const { openCheckout, isLoaded, error } = usePaddleCheckout();
   const { data: backendPlans, isLoading: plansLoading } = useGetAvailablePlans();
+  const createCheckoutMutation = useCreateCheckout();
   
   // Debug logging for subscription page diagnostics
   console.log('[PlanSelection] Backend plans data:', backendPlans);
-  console.log('[PlanSelection] Paddle loaded:', isLoaded, 'Error:', error);
   
   // Use backend plans if available, otherwise fallback to hardcoded plans
   // Ensure plans is always an array to prevent "map is not a function" errors
@@ -91,43 +89,31 @@ export default function PlanSelection() {
 
   const handleSelectPlan = async (plan: Plan) => {
     console.log('[PlanSelection] Select plan button clicked:', plan);
-    console.log('[PlanSelection] Paddle status - isLoaded:', isLoaded, 'error:', error);
     
-    if (!isLoaded) {
-      console.error('[PlanSelection] Paddle is not loaded yet');
-      alert('Payment system is still loading. Please wait a moment and try again.');
-      return;
-    }
-    
-    if (error) {
-      console.error('[PlanSelection] Paddle has an error:', error);
-      alert('Payment system error: ' + error);
-      return;
-    }
-
-    if (!plan.paddleProductId) {
-      console.error('[PlanSelection] Plan missing paddleProductId:', plan);
+    if (!plan.id) {
+      console.error('[PlanSelection] Plan missing id:', plan);
       alert('This plan is not properly configured. Please contact support.');
       return;
     }
 
-    console.log('[PlanSelection] Opening checkout with paddleProductId:', plan.paddleProductId);
+    console.log('[PlanSelection] Creating checkout session for plan:', plan.id);
 
     try {
-      await openCheckout({
-        items: [{ priceId: plan.paddleProductId, quantity: 1 }],
-        onSuccess: (data) => {
-          console.log('[PlanSelection] Subscription successful:', data);
-          // Handle successful subscription
-        },
-        onError: (error) => {
-          console.error('[PlanSelection] Subscription failed:', error);
-          alert('Subscription failed: ' + (error?.message || error));
-        },
-      });
+      // Use the backend checkout mutation to create a checkout session
+      const result = await createCheckoutMutation.mutateAsync(plan.id);
+      
+      console.log('[PlanSelection] Checkout session created:', result);
+      
+      if (result.checkoutUrl) {
+        // Redirect to Paddle checkout page
+        window.location.href = result.checkoutUrl;
+      } else {
+        throw new Error('No checkout URL received from server');
+      }
     } catch (error) {
-      console.error('[PlanSelection] Failed to open checkout:', error);
-      alert('Failed to open payment form: ' + (error?.message || error));
+      console.error('[PlanSelection] Failed to create checkout session:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert('Failed to start checkout process: ' + errorMessage);
     }
   };
 
@@ -218,12 +204,16 @@ export default function PlanSelection() {
 
             <div className="mt-8">
               <Button
-                variant={plan.popular ? 'default' : 'outline'}
                 className="w-full"
                 onClick={() => handleSelectPlan(plan)}
-                disabled={false}
+                disabled={createCheckoutMutation.isLoading}
               >
-                {(
+                {createCheckoutMutation.isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {localize('com_subscription_processing')}
+                  </>
+                ) : (
                   <>
                     {plan.popular && <Zap className="mr-2 h-4 w-4" />}
                     {localize('com_subscription_select_plan')}
