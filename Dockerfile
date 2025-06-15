@@ -3,6 +3,10 @@
 # Base node image
 FROM node:20-alpine AS node
 
+# Declare build arguments for frontend environment variables
+ARG VITE_PADDLE_CLIENT_TOKEN
+ARG VITE_PADDLE_ENVIRONMENT
+
 # Install jemalloc
 RUN apk add --no-cache jemalloc
 RUN apk add --no-cache python3 py3-pip uv
@@ -30,6 +34,9 @@ RUN \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
     npm install --no-audit; \
+    # Set frontend environment variables for build
+    export VITE_PADDLE_CLIENT_TOKEN="${VITE_PADDLE_CLIENT_TOKEN}" ; \
+    export VITE_PADDLE_ENVIRONMENT="${VITE_PADDLE_ENVIRONMENT}" ; \
     # React client build
     NODE_OPTIONS="--max-old-space-size=2048" npm run frontend; \
     npm prune --production; \

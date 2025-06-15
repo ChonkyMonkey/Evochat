@@ -18,4 +18,14 @@ LOCAL_DOCKER_IMG=librechat:${TAG}
 
 set -e
 
-docker build -t ${LOCAL_DOCKER_IMG} .
+# Build args for Paddle frontend environment variables
+BUILD_ARGS=""
+if [[ ! -z "${VITE_PADDLE_CLIENT_TOKEN}" ]]; then
+  BUILD_ARGS="${BUILD_ARGS} --build-arg VITE_PADDLE_CLIENT_TOKEN=${VITE_PADDLE_CLIENT_TOKEN}"
+fi
+if [[ ! -z "${VITE_PADDLE_ENVIRONMENT}" ]]; then
+  BUILD_ARGS="${BUILD_ARGS} --build-arg VITE_PADDLE_ENVIRONMENT=${VITE_PADDLE_ENVIRONMENT}"
+fi
+
+echo "Building Docker image with build args: ${BUILD_ARGS}"
+docker build ${BUILD_ARGS} -t ${LOCAL_DOCKER_IMG} .

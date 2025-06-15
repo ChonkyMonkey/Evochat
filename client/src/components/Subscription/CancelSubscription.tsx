@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useLocalize } from '~/hooks';
-import { usePaddle } from '~/contexts/PaddleProvider';
-import { useGetUserSubscription } from 'librechat-data-provider/react-query';
+import { useGetUserSubscription } from '~/data-provider';
 import { Button } from '~/components/ui';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -11,7 +10,6 @@ interface CancelSubscriptionProps {
 
 const CancelSubscription: React.FC<CancelSubscriptionProps> = ({ onClose }) => {
   const localize = useLocalize();
-  const { paddle } = usePaddle();
   const { data: subscription } = useGetUserSubscription();
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -21,18 +19,30 @@ const CancelSubscription: React.FC<CancelSubscriptionProps> = ({ onClose }) => {
   };
 
   const handleConfirmCancel = async () => {
-    if (!paddle || !subscription?.paddleSubscriptionId) {
+    if (!subscription?.id) {
       return;
     }
 
     setIsProcessing(true);
     try {
-      // Use Paddle's customer portal for cancellation
-      paddle.CustomerPortal.open({
-        customerId: subscription.paddleCustomerId,
-        subscriptionId: subscription.paddleSubscriptionId,
-        initialView: 'cancel_subscription',
+      // Call backend API to get customer portal URL for cancellation
+      const response = await fetch('/api/subscription/portal', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to get customer portal URL');
+      }
+
+      const data = await response.json();
+      
+      if (data.portalUrl) {
+        // Redirect to Paddle customer portal
+        window.open(data.portalUrl, '_blank');
+      }
       
       // Close the dialog after opening the portal
       if (onClose) {
@@ -40,6 +50,7 @@ const CancelSubscription: React.FC<CancelSubscriptionProps> = ({ onClose }) => {
       }
     } catch (error) {
       console.error('Failed to open cancellation portal:', error);
+      alert('Failed to open customer portal. Please contact support.');
     } finally {
       setIsProcessing(false);
     }

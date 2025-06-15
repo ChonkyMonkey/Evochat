@@ -1,27 +1,43 @@
 import React from 'react';
 import { useLocalize } from '~/hooks';
-import { useGetUserSubscription } from 'librechat-data-provider/react-query';
-import { usePaddle } from '~/contexts/PaddleProvider';
+import { useGetUserSubscription } from '~/data-provider';
 import { Button } from '~/components/ui';
 
 const BillingHistory: React.FC = () => {
   const localize = useLocalize();
-  const { paddle, isLoaded } = usePaddle();
   const { data: subscription, isLoading } = useGetUserSubscription();
 
-  const handleOpenCustomerPortal = () => {
-    if (!paddle || !subscription?.paddleCustomerId) {
+  const handleOpenCustomerPortal = async () => {
+    if (!subscription?.id) {
       return;
     }
 
-    // Use Paddle's customer portal for billing history and invoice management
-    paddle.CustomerPortal.open({
-      customerId: subscription.paddleCustomerId,
-      subscriptionId: subscription.paddleSubscriptionId,
-    });
+    try {
+      // Call backend API to get customer portal URL
+      const response = await fetch('/api/subscription/portal', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get customer portal URL');
+      }
+
+      const data = await response.json();
+      
+      if (data.portalUrl) {
+        // Open Paddle customer portal in new tab
+        window.open(data.portalUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Failed to open customer portal:', error);
+      alert('Failed to open customer portal. Please contact support.');
+    }
   };
 
-  if (isLoading || !isLoaded) {
+  if (isLoading) {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

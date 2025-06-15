@@ -1,6 +1,10 @@
 # Dockerfile.multi
 # v0.7.8
 
+# Declare build arguments for frontend environment variables at the top
+ARG VITE_PADDLE_CLIENT_TOKEN
+ARG VITE_PADDLE_ENVIRONMENT
+
 # Base for all builds
 FROM node:20-alpine AS base-min
 # Install jemalloc
@@ -47,9 +51,15 @@ RUN npm run build
 
 # Client build
 FROM base AS client-build
+# Re-declare build arguments for this stage
+ARG VITE_PADDLE_CLIENT_TOKEN
+ARG VITE_PADDLE_ENVIRONMENT
 WORKDIR /app/client
 COPY client ./
 COPY --from=data-provider-build /app/packages/data-provider/dist /app/packages/data-provider/dist
+# Set frontend environment variables for build
+ENV VITE_PADDLE_CLIENT_TOKEN=${VITE_PADDLE_CLIENT_TOKEN}
+ENV VITE_PADDLE_ENVIRONMENT=${VITE_PADDLE_ENVIRONMENT}
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
