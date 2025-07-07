@@ -21,6 +21,14 @@ USER node
 
 COPY --chown=node:node . .
 
+# Accept build-time environment variables for Vite
+ARG VITE_PADDLE_CLIENT_TOKEN
+ARG VITE_PADDLE_ENVIRONMENT
+
+# Set them as environment variables for the build process
+ENV VITE_PADDLE_CLIENT_TOKEN=$VITE_PADDLE_CLIENT_TOKEN
+ENV VITE_PADDLE_ENVIRONMENT=$VITE_PADDLE_ENVIRONMENT
+
 RUN \
     # Allow mounting of these files, which have no default
     touch .env ; \
@@ -30,6 +38,11 @@ RUN \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
     npm install --no-audit; \
+    # Debug environment variables during build
+    echo "=== BUILD-TIME ENV DEBUG ===" && \
+    echo "VITE_PADDLE_CLIENT_TOKEN: ${VITE_PADDLE_CLIENT_TOKEN}" && \
+    echo "VITE_PADDLE_ENVIRONMENT: ${VITE_PADDLE_ENVIRONMENT}" && \
+    echo "===========================" && \
     # React client build
     NODE_OPTIONS="--max-old-space-size=2048" npm run frontend; \
     npm prune --production; \
