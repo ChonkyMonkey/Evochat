@@ -112,7 +112,7 @@ export const useCancelSubscription = (): UseMutationResult<
 > => {
   const queryClient = useQueryClient();
   return useMutation(
-    (immediately: boolean = false) => subscriptionService.cancelSubscription(immediately),
+    (immediately: boolean) => subscriptionService.cancelSubscription(immediately),
     {
       onSuccess: () => {
         // Invalidate subscription queries when cancellation is successful

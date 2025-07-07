@@ -138,7 +138,7 @@ export const createCheckoutSession = async (planId: string): Promise<Subscriptio
   return data.success ? data : data;
 };
 
-export const cancelSubscription = async (immediately: boolean = false): Promise<{ success: boolean; message: string }> => {
+export const cancelSubscription = async (immediately: boolean): Promise<{ success: boolean; message: string }> => {
   const token = localStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
