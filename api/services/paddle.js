@@ -210,6 +210,29 @@ class PaddleService {
       return customer;
     } catch (error) {
       logger.error('[PaddleService] Error creating customer:', error);
+      
+      // Enhanced error logging for Paddle API permission debugging
+      if (error.status === 403 || error.response?.status === 403) {
+        logger.error('[PaddleService] 403 Forbidden - Check API key permissions in Paddle Dashboard:');
+        logger.error('🔧 REQUIRED permissions for customer creation:');
+        logger.error('   ✅ Read and write customers');
+        logger.error('   ✅ Read products and prices (if needed)');
+        logger.error('');
+        logger.error('❌ NOT REQUIRED for backend customer operations:');
+        logger.error('   ❌ Read and write client-side tokens (this is ONLY for frontend Paddle.js operations)');
+        logger.error('');
+        logger.error('📍 Steps to fix:');
+        logger.error('   1. Go to Paddle Dashboard → Developer tools → Authentication');
+        logger.error('   2. Edit your API key permissions');
+        logger.error('   3. Ensure "Read and write customers" is enabled');
+        logger.error('   4. Save the permissions');
+        logger.error('');
+        logger.error('🔑 API Key validation:');
+        logger.error(`   Format: ${this.apiKey ? 'API key is set' : 'API key is missing!'}`);
+        logger.error(`   Starts with pdl_: ${this.apiKey?.startsWith('pdl_') ? 'Yes (new format)' : 'No (legacy format or invalid)'}`);
+        logger.error(`   Environment: ${this.environment}`);
+      }
+      
       throw error;
     }
   }

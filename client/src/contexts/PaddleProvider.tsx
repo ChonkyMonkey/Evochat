@@ -37,15 +37,6 @@ export const PaddleProvider: React.FC<PaddleProviderProps> = ({ children }) => {
         const paddleEnvironment = import.meta.env.VITE_PADDLE_ENVIRONMENT as 'sandbox' | 'production' || 'sandbox';
         const paddleToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
 
-        // Enhanced debug logging for build-time environment variable issues
-        console.log('=== PADDLE ENV DEBUG ===');
-        console.log('All import.meta.env:', import.meta.env);
-        console.log('Raw token value:', import.meta.env.VITE_PADDLE_CLIENT_TOKEN);
-        console.log('Type of token:', typeof import.meta.env.VITE_PADDLE_CLIENT_TOKEN);
-        console.log('String representation:', String(import.meta.env.VITE_PADDLE_CLIENT_TOKEN));
-        console.log('Environment variables available:', Object.keys(import.meta.env));
-        console.log('========================');
-
         // Debug environment variables (remove in production)
         console.log('Paddle Environment Variables:', {
           environment: paddleEnvironment,

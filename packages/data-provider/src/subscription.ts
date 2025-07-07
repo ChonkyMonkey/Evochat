@@ -1,4 +1,5 @@
 import * as endpoints from './api-endpoints';
+import request from './request';
 import type {
   ISubscription,
   IPlan,
@@ -193,62 +194,27 @@ export const cancelSubscription = async (immediately: boolean): Promise<{ succes
 export const updateSubscription = async (
   planId: string
 ): Promise<ISubscription> => {
-  const token = localStorage.getItem('token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-  };
-
-  const response = await fetch('/api/subscription/update', {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify({ planId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update subscription: ${response.statusText}`);
+  try {
+    return await request.put('/api/subscription/update', { planId });
+  } catch (error: any) {
+    throw new Error(`Failed to update subscription: ${error.message}`);
   }
-
-  return response.json();
 };
 
 export const resumeSubscription = async (): Promise<ISubscription> => {
-  const token = localStorage.getItem('token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-  };
-
-  const response = await fetch('/api/subscription/resume', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({}),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to resume subscription: ${response.statusText}`);
+  try {
+    return await request.post('/api/subscription/resume', {});
+  } catch (error: any) {
+    throw new Error(`Failed to resume subscription: ${error.message}`);
   }
-
-  return response.json();
 };
 
 // Get customer portal URL for billing management
 export const getCustomerPortalUrl = async (): Promise<{ portalUrl: string }> => {
-  const token = localStorage.getItem('token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-  };
-
-  const response = await fetch('/api/subscription/portal', {
-    method: 'GET',
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to get customer portal: ${response.statusText}`);
+  try {
+    const data: any = await request.get('/api/subscription/portal');
+    return data.success ? { portalUrl: data.portalUrl } : data;
+  } catch (error: any) {
+    throw new Error(`Failed to get customer portal: ${error.message}`);
   }
-
-  const data = await response.json();
-  return data.success ? { portalUrl: data.portalUrl } : data;
 };
