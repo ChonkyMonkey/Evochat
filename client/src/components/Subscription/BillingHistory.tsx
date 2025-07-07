@@ -1,27 +1,26 @@
 import React from 'react';
 import { useLocalize } from '~/hooks';
-import { useGetUserSubscription } from 'librechat-data-provider/react-query';
-import { usePaddle } from '~/contexts/PaddleProvider';
+import { useGetUserSubscription, useGetCustomerPortal } from '~/data-provider';
 import { Button } from '~/components/ui';
 
 const BillingHistory: React.FC = () => {
   const localize = useLocalize();
-  const { paddle, isLoaded } = usePaddle();
   const { data: subscription, isLoading } = useGetUserSubscription();
+  const { mutate: getPortalUrl, isLoading: portalLoading } = useGetCustomerPortal();
 
   const handleOpenCustomerPortal = () => {
-    if (!paddle || !subscription?.paddleCustomerId) {
-      return;
-    }
-
-    // Use Paddle's customer portal for billing history and invoice management
-    paddle.CustomerPortal.open({
-      customerId: subscription.paddleCustomerId,
-      subscriptionId: subscription.paddleSubscriptionId,
+    getPortalUrl(undefined, {
+      onSuccess: (data) => {
+        // Open customer portal in new window/tab
+        window.open(data.portalUrl, '_blank', 'noopener,noreferrer');
+      },
+      onError: (error) => {
+        console.error('Failed to get customer portal URL:', error);
+      },
     });
   };
 
-  if (isLoading || !isLoaded) {
+  if (isLoading) {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -52,8 +51,9 @@ const BillingHistory: React.FC = () => {
           onClick={handleOpenCustomerPortal}
           variant="default"
           size="sm"
+          disabled={portalLoading}
         >
-          {localize('com_billing_view_invoices')}
+          {portalLoading ? localize('com_ui_loading') : localize('com_billing_view_invoices')}
         </Button>
       </div>
 
@@ -99,8 +99,9 @@ const BillingHistory: React.FC = () => {
             onClick={handleOpenCustomerPortal}
             variant="outline"
             size="sm"
+            disabled={portalLoading}
           >
-            {localize('com_billing_open_customer_portal')}
+            {portalLoading ? localize('com_ui_loading') : localize('com_billing_open_customer_portal')}
           </Button>
         </div>
       </div>

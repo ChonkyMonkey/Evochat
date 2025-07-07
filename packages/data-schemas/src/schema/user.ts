@@ -129,6 +129,11 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
+    paddleCustomerId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     personalization: {
       type: {
         memories: {

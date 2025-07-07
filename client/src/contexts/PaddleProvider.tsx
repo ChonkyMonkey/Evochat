@@ -41,17 +41,10 @@ export const PaddleProvider: React.FC<PaddleProviderProps> = ({ children }) => {
           throw new Error('Paddle client token is not configured');
         }
 
-        // Initialize Paddle
+        // Initialize Paddle - simpler initialization per official docs
         const paddleInstance = await initializePaddle({
           environment: paddleEnvironment,
           token: paddleToken,
-          checkout: {
-            settings: {
-              displayMode: 'overlay',
-              theme: 'light',
-              locale: 'en',
-            },
-          },
         });
 
         if (!paddleInstance) {
@@ -126,8 +119,33 @@ export const usePaddleCheckout = () => {
     });
   };
 
+  const getPricePreview = (options: {
+    items: Array<{
+      priceId: string;
+      quantity?: number;
+    }>;
+    currencyCode?: string;
+    discountId?: string;
+    address?: {
+      countryCode: string;
+      postalCode?: string;
+    };
+  }) => {
+    if (!paddle || !isLoaded) {
+      throw new Error('Paddle is not loaded yet');
+    }
+
+    return paddle.PricePreview({
+      items: options.items,
+      currencyCode: options.currencyCode,
+      discountId: options.discountId,
+      address: options.address,
+    });
+  };
+
   return {
     openCheckout,
+    getPricePreview,
     isLoaded,
     error,
   };

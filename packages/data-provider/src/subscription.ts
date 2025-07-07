@@ -9,11 +9,15 @@ import type {
 
 // Subscription API functions
 export const getCurrentSubscription = async (): Promise<ISubscription | null> => {
-  const response = await fetch('/api/subscription', {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
+  const response = await fetch('/api/subscription/current', {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -23,7 +27,8 @@ export const getCurrentSubscription = async (): Promise<ISubscription | null> =>
     throw new Error(`Failed to get subscription: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.success ? data.subscription : null;
 };
 
 export const getAvailablePlans = async (): Promise<IPlan[]> => {
@@ -38,15 +43,20 @@ export const getAvailablePlans = async (): Promise<IPlan[]> => {
     throw new Error(`Failed to get plans: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.success ? data.plans : [];
 };
 
 export const getSubscriptionStatus = async (): Promise<SubscriptionStatus | null> => {
-  const response = await fetch('/api/subscription/status', {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
+  const response = await fetch('/api/subscription/current', {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -56,31 +66,67 @@ export const getSubscriptionStatus = async (): Promise<SubscriptionStatus | null
     throw new Error(`Failed to get subscription status: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (!data.success) {
+    return null;
+  }
+
+  // Convert backend response to SubscriptionStatus format
+  return {
+    isActive: data.isActive,
+    isExpired: data.isExpired,
+    remainingDays: data.remainingDays,
+    plan: data.plan,
+    currentUsage: {
+      tokensUsed: data.usage?.tokens || 0,
+      requestCount: data.usage?.requests || 0,
+      percentage: 0, // Calculate if needed
+    },
+  };
 };
 
 export const getUsageData = async (period?: 'current' | 'last_month'): Promise<UsageSummary> => {
-  const periodParam = period ? `?period=${period}` : '';
-  const response = await fetch(`/api/subscription/usage${periodParam}`, {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
+  const response = await fetch('/api/subscription/current', {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
 
   if (!response.ok) {
     throw new Error(`Failed to get usage data: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.success && data.usage ? {
+    totalTokensUsed: data.usage.tokens || 0,
+    totalRequests: data.usage.requests || 0,
+    modelBreakdown: [],
+    dailyAverage: 0,
+    weeklyTrend: [],
+  } : {
+    totalTokensUsed: 0,
+    totalRequests: 0,
+    modelBreakdown: [],
+    dailyAverage: 0,
+    weeklyTrend: [],
+  };
 };
 
 export const createCheckoutSession = async (planId: string): Promise<SubscriptionCheckoutData> => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
   const response = await fetch('/api/subscription/checkout', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ planId }),
   });
 
@@ -88,16 +134,21 @@ export const createCheckoutSession = async (planId: string): Promise<Subscriptio
     throw new Error(`Failed to create checkout session: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.success ? data : data;
 };
 
-export const cancelSubscription = async (subscriptionId: string): Promise<{ success: boolean; message: string }> => {
+export const cancelSubscription = async (immediately: boolean = false): Promise<{ success: boolean; message: string }> => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
   const response = await fetch('/api/subscription/cancel', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId }),
+    headers,
+    body: JSON.stringify({ immediately }),
   });
 
   if (!response.ok) {
@@ -108,15 +159,18 @@ export const cancelSubscription = async (subscriptionId: string): Promise<{ succ
 };
 
 export const updateSubscription = async (
-  subscriptionId: string, 
   planId: string
 ): Promise<ISubscription> => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
   const response = await fetch('/api/subscription/update', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId, planId }),
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ planId }),
   });
 
   if (!response.ok) {
@@ -126,13 +180,17 @@ export const updateSubscription = async (
   return response.json();
 };
 
-export const resumeSubscription = async (subscriptionId: string): Promise<ISubscription> => {
+export const resumeSubscription = async (): Promise<ISubscription> => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
   const response = await fetch('/api/subscription/resume', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId }),
+    headers,
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
@@ -142,17 +200,23 @@ export const resumeSubscription = async (subscriptionId: string): Promise<ISubsc
   return response.json();
 };
 
-export const getSubscriptionHistory = async (): Promise<ISubscription[]> => {
-  const response = await fetch('/api/subscription/history', {
+// Get customer portal URL for billing management
+export const getCustomerPortalUrl = async (): Promise<{ portalUrl: string }> => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+
+  const response = await fetch('/api/subscription/portal', {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to get subscription history: ${response.statusText}`);
+    throw new Error(`Failed to get customer portal: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.success ? { portalUrl: data.portalUrl } : data;
 };

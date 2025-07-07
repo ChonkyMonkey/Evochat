@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRecoilValue } from 'recoil';
 import { CheckCircle, AlertTriangle, Calendar, CreditCard } from 'lucide-react';
-import { useGetUserSubscription } from '~/data-provider';
+import { useGetUserSubscription, useCancelSubscription, useGetCustomerPortal } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { Button } from '~/components/ui';
 import subscriptionStore from '~/store/subscription';
@@ -11,8 +11,36 @@ export default function SubscriptionOverview() {
   const localize = useLocalize();
   const subscription = useRecoilValue(subscriptionStore.subscription);
   const { data: subscriptionData, isLoading } = useGetUserSubscription();
+  const { mutate: cancelSubscription, isLoading: cancelLoading } = useCancelSubscription();
+  const { mutate: getPortalUrl, isLoading: portalLoading } = useGetCustomerPortal();
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const currentPlan = subscriptionData || subscription;
+
+  const handleManageSubscription = () => {
+    getPortalUrl(undefined, {
+      onSuccess: (data) => {
+        // Open customer portal in new window/tab
+        window.open(data.portalUrl, '_blank', 'noopener,noreferrer');
+      },
+      onError: (error) => {
+        console.error('Failed to get customer portal URL:', error);
+      },
+    });
+  };
+
+  const handleCancelSubscription = () => {
+    cancelSubscription(false, {
+      onSuccess: () => {
+        setShowCancelConfirm(false);
+        // Optionally show success message
+      },
+      onError: (error) => {
+        console.error('Failed to cancel subscription:', error);
+        // Optionally show error message
+      },
+    });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -70,7 +98,7 @@ export default function SubscriptionOverview() {
           <div className={cn('flex items-center gap-2', getStatusColor(currentPlan?.status || ''))}>
             {getStatusIcon(currentPlan?.status || '')}
             <span className="text-sm font-medium">
-              {currentPlan?.status ? localize(`com_subscription_status_${currentPlan.status}`) : localize('com_subscription_no_subscription')}
+              {currentPlan?.status ? currentPlan.status : localize('com_subscription_no_subscription')}
             </span>
           </div>
         </div>
@@ -86,7 +114,7 @@ export default function SubscriptionOverview() {
           <div className="space-y-2">
             <div className="text-sm text-text-secondary">{localize('com_subscription_billing_cycle')}</div>
             <div className="text-base text-text-primary">
-              {currentPlan?.billingCycle ? localize(`com_subscription_cycle_${currentPlan.billingCycle}`) : localize('com_subscription_not_applicable')}
+              {currentPlan?.billingCycle ? currentPlan.billingCycle : localize('com_subscription_not_applicable')}
             </div>
           </div>
 
@@ -158,7 +186,11 @@ export default function SubscriptionOverview() {
             variant="default"
             className="flex items-center gap-2"
             onClick={() => {
-              // Handle upgrade/downgrade
+              // Navigate to plans tab or trigger plan selection
+              const plansTab = document.querySelector('[value="plans"]') as HTMLElement;
+              if (plansTab) {
+                plansTab.click();
+              }
             }}
           >
             <CreditCard className="h-4 w-4" />
@@ -168,24 +200,48 @@ export default function SubscriptionOverview() {
           {currentPlan?.status === 'active' && (
             <Button
               variant="outline"
-              onClick={() => {
-                // Handle manage subscription
-              }}
+              onClick={handleManageSubscription}
+              disabled={portalLoading}
             >
-              {localize('com_subscription_manage')}
+              {portalLoading ? localize('com_ui_loading') : localize('com_subscription_manage')}
             </Button>
           )}
         </div>
 
         {currentPlan?.status === 'active' && (
-          <Button
-            variant="destructive"
-            onClick={() => {
-              // Handle cancel subscription
-            }}
-          >
-            {localize('com_subscription_cancel')}
-          </Button>
+          <div className="flex flex-col gap-2">
+            {!showCancelConfirm ? (
+              <Button
+                variant="destructive"
+                onClick={() => setShowCancelConfirm(true)}
+              >
+                {localize('com_subscription_cancel')}
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-text-secondary">
+                  {localize('com_subscription_cancel_confirm')}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleCancelSubscription}
+                    disabled={cancelLoading}
+                  >
+                    {cancelLoading ? localize('com_ui_loading') : localize('com_ui_yes')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCancelConfirm(false)}
+                  >
+                    {localize('com_ui_cancel')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

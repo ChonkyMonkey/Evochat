@@ -116,6 +116,15 @@ router.post('/checkout', requireJwtAuth, async (req, res) => {
       });
     }
     
+    // Ensure user has a Paddle customer
+    const { getUserService } = require('~/services/userService');
+    const userService = getUserService();
+    const paddleCustomerId = await userService.ensurePaddleCustomer(
+      userId,
+      req.user.email,
+      req.user.name || req.user.username
+    );
+
     // Create checkout session
     const checkoutSession = await paddleService.createCheckoutSession({
       planId,
@@ -123,6 +132,7 @@ router.post('/checkout', requireJwtAuth, async (req, res) => {
       customData: {
         customerEmail: req.user.email,
         customerName: req.user.name || req.user.username,
+        paddleCustomerId,
       },
     });
     
@@ -251,12 +261,28 @@ router.get('/portal', requireJwtAuth, async (req, res) => {
       });
     }
     
-    // TODO: Implement Paddle customer portal URL generation
-    // This would involve calling Paddle's customer portal API
+    const paddleService = getPaddleService();
     
-    res.status(501).json({
-      success: false,
-      error: 'Customer portal not yet implemented',
+    // Get user's Paddle customer ID
+    const { getUserById } = require('~/models');
+    const user = await getUserById(userId);
+    
+    if (!user?.paddleCustomerId) {
+      return res.status(404).json({
+        success: false,
+        error: 'No Paddle customer found for user',
+      });
+    }
+
+    // Create customer portal session
+    const portalSession = await paddleService.createCustomerPortalSession(
+      user.paddleCustomerId,
+      [subscription.paddleSubscriptionId]
+    );
+
+    res.json({
+      success: true,
+      portalUrl: portalSession.url,
     });
     
   } catch (error) {

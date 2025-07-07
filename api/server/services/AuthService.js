@@ -20,6 +20,7 @@ const {
 const { isEnabled, checkEmailConfig, sendEmail } = require('~/server/utils');
 const { isEmailDomainAllowed } = require('~/server/services/domains');
 const { getBalanceConfig } = require('~/server/services/Config');
+const { getUserService } = require('~/services/userService');
 const { registerSchema } = require('~/strategies/validators');
 const { logger } = require('~/config');
 
@@ -219,7 +220,9 @@ const registerUser = async (user, additionalData = {}) => {
     const disableTTL = isEnabled(process.env.ALLOW_UNVERIFIED_EMAIL_LOGIN);
     const balanceConfig = await getBalanceConfig();
 
-    const newUser = await createUser(newUserData, balanceConfig, disableTTL, true);
+    // Use UserService for Paddle integration
+    const userService = getUserService();
+    const newUser = await userService.createUserWithPaddle(newUserData, balanceConfig, disableTTL, true);
     newUserId = newUser._id;
     if (emailEnabled && !newUser.emailVerified) {
       await sendVerificationEmail({

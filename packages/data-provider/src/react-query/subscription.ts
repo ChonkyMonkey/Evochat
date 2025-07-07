@@ -81,21 +81,7 @@ export const useGetUsageData = (
   );
 };
 
-// Query: Get subscription history
-export const useGetSubscriptionHistory = (
-  config?: UseQueryOptions<ISubscription[]>,
-): QueryObserverResult<ISubscription[]> => {
-  return useQuery<ISubscription[]>(
-    [QueryKeys.subscriptionHistory],
-    () => subscriptionService.getSubscriptionHistory(),
-    {
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      refetchOnMount: false,
-      ...config,
-    },
-  );
-};
+// Note: Subscription history is now handled via customer portal
 
 // Mutation: Create checkout session
 export const useCreateCheckout = (): UseMutationResult<
@@ -121,18 +107,17 @@ export const useCreateCheckout = (): UseMutationResult<
 export const useCancelSubscription = (): UseMutationResult<
   { success: boolean; message: string },
   Error,
-  string,
+  boolean,
   unknown
 > => {
   const queryClient = useQueryClient();
   return useMutation(
-    (subscriptionId: string) => subscriptionService.cancelSubscription(subscriptionId),
+    (immediately: boolean = false) => subscriptionService.cancelSubscription(immediately),
     {
       onSuccess: () => {
         // Invalidate subscription queries when cancellation is successful
         queryClient.invalidateQueries([QueryKeys.subscription]);
         queryClient.invalidateQueries([QueryKeys.subscriptionStatus]);
-        queryClient.invalidateQueries([QueryKeys.subscriptionHistory]);
       },
     },
   );
@@ -142,19 +127,17 @@ export const useCancelSubscription = (): UseMutationResult<
 export const useUpdateSubscription = (): UseMutationResult<
   ISubscription,
   Error,
-  { subscriptionId: string; planId: string },
+  string,
   unknown
 > => {
   const queryClient = useQueryClient();
   return useMutation(
-    ({ subscriptionId, planId }: { subscriptionId: string; planId: string }) =>
-      subscriptionService.updateSubscription(subscriptionId, planId),
+    (planId: string) => subscriptionService.updateSubscription(planId),
     {
       onSuccess: () => {
         // Invalidate subscription queries when update is successful
         queryClient.invalidateQueries([QueryKeys.subscription]);
         queryClient.invalidateQueries([QueryKeys.subscriptionStatus]);
-        queryClient.invalidateQueries([QueryKeys.subscriptionHistory]);
       },
     },
   );
@@ -164,19 +147,28 @@ export const useUpdateSubscription = (): UseMutationResult<
 export const useResumeSubscription = (): UseMutationResult<
   ISubscription,
   Error,
-  string,
+  void,
   unknown
 > => {
   const queryClient = useQueryClient();
   return useMutation(
-    (subscriptionId: string) => subscriptionService.resumeSubscription(subscriptionId),
+    () => subscriptionService.resumeSubscription(),
     {
       onSuccess: () => {
         // Invalidate subscription queries when resume is successful
         queryClient.invalidateQueries([QueryKeys.subscription]);
         queryClient.invalidateQueries([QueryKeys.subscriptionStatus]);
-        queryClient.invalidateQueries([QueryKeys.subscriptionHistory]);
       },
     },
   );
+};
+
+// Mutation: Get customer portal URL
+export const useGetCustomerPortal = (): UseMutationResult<
+  { portalUrl: string },
+  Error,
+  void,
+  unknown
+> => {
+  return useMutation(() => subscriptionService.getCustomerPortalUrl());
 };
