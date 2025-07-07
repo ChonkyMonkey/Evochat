@@ -37,28 +37,51 @@ export const PaddleProvider: React.FC<PaddleProviderProps> = ({ children }) => {
         const paddleEnvironment = import.meta.env.VITE_PADDLE_ENVIRONMENT as 'sandbox' | 'production' || 'sandbox';
         const paddleToken = import.meta.env.VITE_PADDLE_CLIENT_TOKEN;
 
+        // Debug environment variables (remove in production)
+        console.log('Paddle Environment Variables:', {
+          environment: paddleEnvironment,
+          hasToken: !!paddleToken,
+          tokenPrefix: paddleToken?.substring(0, 5) + '...',
+        });
+
         if (!paddleToken) {
-          throw new Error('Paddle client token is not configured');
+          const errorMsg = 'Paddle client token is not configured. Please set VITE_PADDLE_CLIENT_TOKEN environment variable.';
+          console.warn('[PaddleProvider]', errorMsg);
+          setError(errorMsg);
+          setIsLoaded(false);
+          return; // Don't initialize Paddle without token
         }
 
-        // Initialize Paddle - simpler initialization per official docs
+        // Validate token format
+        if (!paddleToken.startsWith('test_') && !paddleToken.startsWith('live_')) {
+          const errorMsg = 'Invalid Paddle client token format. Expected format: test_xxx or live_xxx';
+          console.error('[PaddleProvider]', errorMsg);
+          setError(errorMsg);
+          setIsLoaded(false);
+          return;
+        }
+
+        console.log('[PaddleProvider] Initializing Paddle.js...');
+
+        // Initialize Paddle using current best practices
         const paddleInstance = await initializePaddle({
           environment: paddleEnvironment,
           token: paddleToken,
         });
 
         if (!paddleInstance) {
-          throw new Error('Failed to initialize Paddle');
+          throw new Error('Failed to initialize Paddle - no instance returned');
         }
 
         setPaddle(paddleInstance);
         setIsLoaded(true);
         setError(null);
+        console.log('[PaddleProvider] Paddle.js initialized successfully');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize Paddle';
+        console.error('[PaddleProvider] Initialization error:', err);
         setError(errorMessage);
         setIsLoaded(false);
-        console.error('Paddle initialization error:', err);
       }
     };
 

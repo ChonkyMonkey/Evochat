@@ -10,6 +10,13 @@ import type {
 // Subscription API functions
 export const getCurrentSubscription = async (): Promise<ISubscription | null> => {
   const token = localStorage.getItem('token');
+  
+  // Debug authentication
+  console.log('[SubscriptionAPI] Getting current subscription:', {
+    hasToken: !!token,
+    tokenPrefix: token?.substring(0, 20) + '...',
+  });
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -21,6 +28,16 @@ export const getCurrentSubscription = async (): Promise<ISubscription | null> =>
   });
 
   if (!response.ok) {
+    console.error('[SubscriptionAPI] Request failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      hasToken: !!token,
+    });
+    
+    if (response.status === 401) {
+      console.error('[SubscriptionAPI] Authentication failed - check JWT token');
+    }
+    
     if (response.status === 404) {
       return null; // No subscription found
     }
@@ -49,6 +66,11 @@ export const getAvailablePlans = async (): Promise<IPlan[]> => {
 
 export const getSubscriptionStatus = async (): Promise<SubscriptionStatus | null> => {
   const token = localStorage.getItem('token');
+  
+  console.log('[SubscriptionAPI] Getting subscription status:', {
+    hasToken: !!token,
+  });
+  
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -60,6 +82,16 @@ export const getSubscriptionStatus = async (): Promise<SubscriptionStatus | null
   });
 
   if (!response.ok) {
+    console.error('[SubscriptionAPI] Status request failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      hasToken: !!token,
+    });
+    
+    if (response.status === 401) {
+      console.error('[SubscriptionAPI] Authentication failed for status check');
+    }
+    
     if (response.status === 404) {
       return null; // No subscription found
     }
