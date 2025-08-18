@@ -3,7 +3,7 @@
   "version": "v0.8.0-rc2",
   "description": "",
   "scripts": {
-    "build": "tsc",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=4096 tsc",
     "start": "echo 'please run this from the root directory'",
     "server-dev": "echo 'please run this from the root directory'",
     "test": "cross-env NODE_ENV=test jest",
