@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "module": "commonjs",
+    "lib": ["es2018", "esnext.asynciterable"],
+    "allowJs": true,
+    "jsx": "react",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": [
+    "server/**/*.ts",
+    "app/**/*.ts",
+    "lib/**/*.ts",
+    "utils/**/*.ts",
+    "config/**/*.ts",
+    "db/**/*.ts",
+    "models/**/*.ts",
+    "strategies/**/*.ts",
+    "server/**/*.js",
+    "app/**/*.js",
+    "lib/**/*.js",
+    "utils/**/*.js",
+    "config/**/*.js",
+    "db/**/*.js",
+    "models/**/*.js",
+    "strategies/**/*.js",
+    "test/**/*.ts",
+    "test/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

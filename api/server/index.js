@@ -22,6 +22,10 @@ const staticCache = require('./utils/staticCache');
 const noIndex = require('./middleware/noIndex');
 const routes = require('./routes');
 
+//paddle integration routes
+const billingRoutes = require('./routes/billing').default; // .default for ES Module export
+const paddleRoutes = require('./routes/paddle').default;   // .default for ES Module export
+
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
 // Allow PORT=0 to be used for automatic free port assignment
@@ -117,7 +121,11 @@ const startServer = async () => {
   app.use('/api/banner', routes.banner);
   app.use('/api/memories', routes.memories);
   app.use('/api/permissions', routes.accessPermissions);
-
+  
+  // New Paddle Integration Routes
+  app.use('/api/billing', billingRoutes);
+  app.use('/api/paddle', paddleRoutes);
+  
   app.use('/api/tags', routes.tags);
   app.use('/api/mcp', routes.mcp);
 

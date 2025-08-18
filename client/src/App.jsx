@@ -10,6 +10,8 @@ import { ScreenshotProvider, useApiErrorBoundary } from './hooks';
 import { getThemeFromEnv } from './utils/getThemeFromEnv';
 import { LiveAnnouncer } from '~/a11y';
 import { router } from './routes';
+import CustomerCreator from './components/PaddlePOC/CustomerCreator'; //paddle POC component
+import PaddleCheckoutButton from './components/PaddlePOC/PaddleCheckoutButton'; // paddle POC component
 
 const App = () => {
   const { setError } = useApiErrorBoundary();
@@ -44,6 +46,12 @@ const App = () => {
             <RadixToast.Provider>
               <ToastProvider>
                 <DndProvider backend={HTML5Backend}>
+                  {/* Temporary Paddle POC Components */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
+                    <CustomerCreator />
+                    <PaddleCheckoutButton />
+                  </div>
+                  {/* Original Router */}
                   <RouterProvider router={router} />
                   <ReactQueryDevtools initialIsOpen={false} position="top-right" />
                   <Toast />
