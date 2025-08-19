@@ -3,7 +3,7 @@
   "version": "v0.8.0-rc2",
   "description": "",
   "scripts": {
-    "build": "tsc && rsync -a server/index.js dist/server/index.js",
+    "build": "tsc && cp server/index.js dist/server/index.js",
     "start": "echo 'please run this from the root directory'",
     "server-dev": "echo 'please run this from the root directory'",
     "test": "cross-env NODE_ENV=test jest",
