@@ -25,7 +25,7 @@
   "author": "",
   "license": "ISC",
   "_moduleAliases": {
-    "~": "."
+    "~": "./server"
   },
   "imports": {
     "~/*": "./*"

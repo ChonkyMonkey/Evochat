@@ -1,20 +1,13 @@
-// ---- must be first lines ----
-try {
-  // Fast & light for PoC; no type-check at runtime
-  require('ts-node').register({ transpileOnly: true });
-} catch (e) {
-  console.warn('ts-node not available; install it in @librechat/backend');
-}
+require('ts-node').register({ transpileOnly: true });
 
-// if you use "~" aliases (you do), keep this early:
-try {
-  const moduleAlias = require('module-alias');
-  moduleAlias.addAlias('~', __dirname); // __dirname === /app/api/server at runtime
-} catch (_) {}
+const path = require('path');
+const moduleAlias = require('module-alias');
+moduleAlias.addAlias('~', path.resolve(__dirname)); // <- pin "~" to /api/server
+
 
 require('dotenv').config();
 const fs = require('fs');
-const path = require('path');
+// const path = require('path');
 const cors = require('cors');
 const axios = require('axios');
 const express = require('express');
@@ -36,8 +29,8 @@ const noIndex = require('./middleware/noIndex');
 const routes = require('./routes');
 
 //paddle integration routes
-const billingRoutes = require('./routes/billing.ts').default; // .default for ES Module export
-const paddleRoutes = require('./routes/paddle.ts').default;   // .default for ES Module export
+const billingRoutes = require('./routes/billing.ts').default;
+const paddleRoutes = require('./routes/paddle.ts').default;
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
