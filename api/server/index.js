@@ -8,8 +8,9 @@ try {
 
 // if you use "~" aliases (you do), keep this early:
 try {
-  require('module-alias/register');
-} catch (e) {}
+  const moduleAlias = require('module-alias');
+  moduleAlias.addAlias('~', __dirname); // __dirname === /app/api/server at runtime
+} catch (_) {}
 
 require('dotenv').config();
 const fs = require('fs');
