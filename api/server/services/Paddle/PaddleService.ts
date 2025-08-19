@@ -14,8 +14,12 @@ class PaddleService {
     try {
       const customer: Customer = await this.paddle.customers.create(customerData);
       return customer;
-    } catch (error) {
-      console.error('Error creating Paddle customer:', error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Error creating Paddle customer:', error.message);
+      } else {
+        console.error('An unknown error occurred while creating Paddle customer:', error);
+      }
       throw new Error('Failed to create Paddle customer.');
     }
   }
