@@ -2,7 +2,9 @@ require('ts-node').register({ transpileOnly: true });
 
 const path = require('path');
 const moduleAlias = require('module-alias');
-moduleAlias.addAlias('~', path.resolve(__dirname)); // <- pin "~" to /api/server
+
+// IMPORTANT: point "~" to /app/api (NOT /app/api/server)
+moduleAlias.addAlias('~', path.resolve(__dirname, '..'));
 
 
 require('dotenv').config();
