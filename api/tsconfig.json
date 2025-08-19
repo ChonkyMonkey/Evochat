@@ -7,21 +7,6 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./",
-    "resolveJsonModule": true,
-    "declaration": false,
-    "declarationMap": false
-  },
-  "include": [
-    "server/services/Billing/index.ts",
-    "server/services/Paddle/PaddleService.ts",
-    "server/routes/billing.ts",
-    "server/routes/paddle.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+    "resolveJsonModule": true
+  }
 }

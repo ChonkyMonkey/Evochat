@@ -1,7 +1,19 @@
+// ---- must be first lines ----
+try {
+  // Fast & light for PoC; no type-check at runtime
+  require('ts-node').register({ transpileOnly: true });
+} catch (e) {
+  console.warn('ts-node not available; install it in @librechat/backend');
+}
+
+// if you use "~" aliases (you do), keep this early:
+try {
+  require('module-alias/register');
+} catch (e) {}
+
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-require('module-alias')({ base: path.resolve(__dirname, '..') });
 const cors = require('cors');
 const axios = require('axios');
 const express = require('express');
@@ -23,8 +35,8 @@ const noIndex = require('./middleware/noIndex');
 const routes = require('./routes');
 
 //paddle integration routes
-const billingRoutes = require('./routes/billing').default; // .default for ES Module export
-const paddleRoutes = require('./routes/paddle').default;   // .default for ES Module export
+const billingRoutes = require('./routes/billing.ts').default; // .default for ES Module export
+const paddleRoutes = require('./routes/paddle.ts').default;   // .default for ES Module export
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
