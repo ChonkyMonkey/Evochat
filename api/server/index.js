@@ -1,10 +1,20 @@
-require('ts-node').register({ transpileOnly: true });
+require('ts-node').register({
+  transpileOnly: true,
+  skipProject: true, // ignore any tsconfig in the monorepo
+  compilerOptions: {
+    target: 'es2022',
+    module: 'commonjs',
+    moduleResolution: 'node',
+    esModuleInterop: true,
+    resolveJsonModule: true,
+  },
+});
+
 
 const path = require('path');
 const moduleAlias = require('module-alias');
+moduleAlias.addAlias('~', path.resolve(__dirname, '..')); // "~" -> /app/api
 
-// IMPORTANT: point "~" to /app/api (NOT /app/api/server)
-moduleAlias.addAlias('~', path.resolve(__dirname, '..'));
 
 
 require('dotenv').config();
