@@ -1,110 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 function PaddleCheckoutButton() {
   const [priceId, setPriceId] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [paddleInitialized, setPaddleInitialized] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  const initializedRef = useRef(false);
+
+  // wait until the CDN script has created window.Paddle
+  const waitForPaddle = () =>
+    new Promise((resolve, reject) => {
+      let tries = 0;
+      const poll = () => {
+        if (window.Paddle) return resolve(window.Paddle);
+        if (++tries > 100) return reject(new Error('Paddle.js not loaded'));
+        setTimeout(poll, 60);
+      };
+      poll();
+    });
 
   useEffect(() => {
-    // Initialize Paddle.js
-    if (window.Paddle) {
-      window.Paddle.Initialize({
-        environment: 'sandbox', // Use 'sandbox' for testing
-        pw: 'test', // Required for sandbox environment
-      });
-      setPaddleInitialized(true);
-    } else {
-      console.warn('Paddle.js not loaded. Make sure the script is included in index.html');
-      setError('Paddle.js not loaded.');
-      return;
-    }
-
-    // Fetch price ID from backend
-    const fetchPriceId = async () => {
+    let cleanup = () => {};
+    (async () => {
       try {
-        const response = await fetch('/api/paddle/checkout-data');
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch price ID');
+        const Paddle = await waitForPaddle();
+
+        // fetch public client-side config (env + client token + price)
+        const res = await fetch('/api/paddle/config');
+        if (!res.ok) throw new Error('Failed to fetch Paddle config');
+        const { environment, clientToken, priceId: pid } = await res.json();
+
+        if (!clientToken) throw new Error('Missing PADDLE_CLIENT_TOKEN on backend');
+        if (!pid) throw new Error('Missing PADDLE_TEST_PRICE_ID on backend');
+
+        // correct v2 calls: set environment then Initialize with client token
+        if (Paddle.Environment?.set) {
+          Paddle.Environment.set(environment || 'sandbox');
         }
-        const data = await response.json();
-        setPriceId(data.priceId);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
+
+        if (!initializedRef.current) {
+          Paddle.Initialize({ token: clientToken });
+          initializedRef.current = true;
+        }
+
+        // event listeners (optional but handy during PoC)
+        const onLoaded = (evt) => console.log('[Paddle] checkout.loaded', evt);
+        const onCreated = (evt) => console.log('[Paddle] checkout.customer.created', evt);
+        const onCompleted = (evt) => {
+          console.log('[Paddle] checkout.completed', evt);
+          alert('Checkout completed (see console for event payload).');
+        };
+        const onClosed = () => console.log('[Paddle] checkout.closed');
+
+        Paddle.Status.on('checkout.loaded', onLoaded);
+        Paddle.Status.on('checkout.customer.created', onCreated);
+        Paddle.Status.on('checkout.completed', onCompleted);
+        Paddle.Status.on('checkout.closed', onClosed);
+
+        cleanup = () => {
+          try {
+            Paddle.Status.off('checkout.loaded', onLoaded);
+            Paddle.Status.off('checkout.customer.created', onCreated);
+            Paddle.Status.off('checkout.completed', onCompleted);
+            Paddle.Status.off('checkout.closed', onClosed);
+          } catch {}
+        };
+
+        setPriceId(pid);
+        setReady(true);
+      } catch (e) {
+        console.error(e);
+        setError(e.message || String(e));
       }
-    };
+    })();
 
-    if (paddleInitialized) {
-      fetchPriceId();
-    }
+    return () => cleanup();
+  }, []);
 
-    // Set up Paddle event listeners
-    const handleCheckoutLoaded = (event) => {
-      console.log('Paddle checkout loaded:', event);
-    };
-
-    const handleCheckoutCustomerCreated = (event) => {
-      console.log('Paddle checkout customer created:', event);
-    };
-
-    const handleCheckoutSuccess = (event) => {
-      console.log('Paddle checkout success:', event);
-      // You would typically verify this on your backend
-      alert('Checkout successful! Check console for details.');
-    };
-
-    const handleCheckoutClose = () => {
-      console.log('Paddle checkout closed.');
-    };
-
-    window.Paddle.Status.on('checkout.loaded', handleCheckoutLoaded);
-    window.Paddle.Status.on('checkout.customer.created', handleCheckoutCustomerCreated);
-    window.Paddle.Status.on('checkout.completed', handleCheckoutSuccess);
-    window.Paddle.Status.on('checkout.closed', handleCheckoutClose);
-
-    // Clean up event listeners on component unmount
-    return () => {
-      if (window.Paddle) {
-        window.Paddle.Status.off('checkout.loaded', handleCheckoutLoaded);
-        window.Paddle.Status.off('checkout.customer.created', handleCheckoutCustomerCreated);
-        window.Paddle.Status.off('checkout.completed', handleCheckoutSuccess);
-        window.Paddle.Status.off('checkout.closed', handleCheckoutClose);
-      }
-    };
-  }, [paddleInitialized]);
-
-  const handleOpenCheckout = () => {
-    if (window.Paddle && priceId) {
+  const openCheckout = () => {
+    try {
+      if (!window.Paddle) throw new Error('Paddle not ready');
+      if (!priceId) throw new Error('No priceId');
       window.Paddle.Checkout.open({
-        items: [{ priceId: priceId, quantity: 1 }],
+        items: [{ priceId, quantity: 1 }],
       });
-    } else {
-      console.warn('Paddle.js not ready or priceId not available.');
-      setError('Paddle.js not ready or price ID missing.');
+    } catch (e) {
+      setError(e.message);
     }
   };
 
-  if (isLoading) {
-    return <div style={{ padding: '20px', margin: '20px' }}>Loading Paddle checkout data...</div>;
-  }
-
-  if (error) {
-    return <div style={{ padding: '20px', margin: '20px', color: 'red' }}>Error: {error}</div>;
-  }
+  if (error) return <div style={{ color: 'red', padding: 12 }}>Error: {error}</div>;
+  if (!ready) return <div style={{ padding: 12 }}>Loading Paddle…</div>;
 
   return (
-    <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', margin: '20px' }}>
+    <div style={{ padding: 20, border: '1px solid #ccc', borderRadius: 8, margin: 20 }}>
       <h2>Buy with Paddle</h2>
-      <p>Product Price ID: <strong>{priceId || 'N/A'}</strong></p>
-      <button onClick={handleOpenCheckout} disabled={!priceId} style={{ padding: '10px 15px', cursor: 'pointer' }}>
+      <p>Price ID: <strong>{priceId}</strong></p>
+      <button onClick={openCheckout} style={{ padding: '10px 15px', cursor: 'pointer' }}>
         Open Paddle Checkout
       </button>
-      {!priceId && <p style={{ color: 'orange' }}>Waiting for price ID from backend...</p>}
-      <p style={{ fontSize: '0.8em', color: '#666', marginTop: '10px' }}>
-        Check your browser's console for Paddle event logs.
+      <p style={{ fontSize: 12, color: '#666', marginTop: 10 }}>
+        Watch the console for Paddle events.
       </p>
     </div>
   );
