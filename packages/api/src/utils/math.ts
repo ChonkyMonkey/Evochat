@@ -1,3 +1,5 @@
+import { Parser } from 'expr-eval';
+
 /**
  * Evaluates a mathematical expression provided as a string and returns the result.
  *
@@ -13,33 +15,29 @@
  * @throws Throws an error if the input is not a string or number, contains invalid characters, or does not evaluate to a number.
  */
 export function math(str: string | number, fallbackValue?: number): number {
-  const fallback = typeof fallbackValue !== 'undefined' && typeof fallbackValue === 'number';
-  if (typeof str !== 'string' && typeof str === 'number') {
+  const hasFallback = typeof fallbackValue === 'number';
+
+  if (typeof str === 'number') {
     return str;
-  } else if (typeof str !== 'string') {
-    if (fallback) {
-      return fallbackValue;
-    }
-    throw new Error(`str is ${typeof str}, but should be a string`);
   }
 
-  const validStr = /^[+\-\d.\s*/%()]+$/.test(str);
-
-  if (!validStr) {
-    if (fallback) {
-      return fallbackValue;
-    }
-    throw new Error('Invalid characters in string');
+  if (typeof str !== 'string') {
+    if (hasFallback) return fallbackValue as number;
+    throw new Error(`str is ${typeof str}, but should be a string or number`);
   }
 
-  const value = eval(str);
+  try {
+    const parser = new Parser();
+    const value = parser.evaluate(str);
 
-  if (typeof value !== 'number') {
-    if (fallback) {
-      return fallbackValue;
+    if (typeof value !== 'number' || !isFinite(value)) {
+      if (hasFallback) return fallbackValue as number;
+      throw new Error('[math] did not evaluate to a valid number');
     }
-    throw new Error(`[math] str did not evaluate to a number but to a ${typeof value}`);
-  }
 
-  return value;
+    return value;
+  } catch (err) {
+    if (hasFallback) return fallbackValue as number;
+    throw new Error(`[math] invalid expression: ${err}`);
+  }
 }
