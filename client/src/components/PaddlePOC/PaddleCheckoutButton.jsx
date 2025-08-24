@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-function PaddleCheckoutButton({ prefillEmail, successUrl, customData }) {
+function PaddleCheckoutButton({ prefillEmail, customData }) {
   const [priceId, setPriceId] = useState(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
@@ -60,7 +60,7 @@ function PaddleCheckoutButton({ prefillEmail, successUrl, customData }) {
         displayMode: 'overlay',                 // or 'inline' if you wire a frameTarget via Initialize()
         locale: undefined,                      // let Paddle use browser locale
         theme: undefined,                       // 'light' | 'dark' | undefined
-        successUrl: successUrl || undefined,    // optional redirect after completion
+        successUrl: `${window.location.origin}/paddle/success`,    // optional redirect after completion
 
         // --- items OR transactionId ---
         items: [{ priceId, quantity: 1 }],

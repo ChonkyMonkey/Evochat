@@ -1,13 +1,21 @@
-import { Paddle, CreateCustomerRequestBody, Customer } from '@paddle/paddle-node-sdk';
+import { Paddle, CreateCustomerRequestBody, Customer, Environment } from '@paddle/paddle-node-sdk';
+import { env } from 'process';
 
 class PaddleService {
   private paddle: Paddle;
+  private environment: Environment;
+
+
 
   constructor() {
     if (!process.env.PADDLE_API_KEY) {
       throw new Error('PADDLE_API_KEY environment variable is not set.');
     }
-    this.paddle = new Paddle(process.env.PADDLE_API_KEY);
+    if (!process.env.PADDLE_ENVIRONMENT) {
+      throw new Error('PADDLE_ENVIRONMENT environment variable is not set.');
+    }
+    this.environment = process.env.PADDLE_ENVIRONMENT as Environment;
+    this.paddle = new Paddle(process.env.PADDLE_API_KEY, { environment: this.environment});
   }
 
   async createPaddleCustomer(customerData: CreateCustomerRequestBody): Promise<Customer | undefined> {
