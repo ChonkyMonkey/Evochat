@@ -1,6 +1,5 @@
 import { Paddle, CreateCustomerRequestBody, Customer, Environment } from '@paddle/paddle-node-sdk';
-import { env } from 'process';
-
+import WebhookEvent from '../../../models/WebhookEvent';
 class PaddleService {
   private paddle: Paddle;
   private environment: Environment;
@@ -31,6 +30,44 @@ class PaddleService {
       throw new Error('Failed to create Paddle customer.');
     }
   }
+
+    /**
+   * Persist a Paddle webhook event in MongoDB (idempotent).
+   */
+  async persistWebhookEvent(event: any): Promise<void> {
+    const provider = 'paddle';
+    const type = event?.eventType ?? 'unknown';
+
+    const occurredAt = event?.issuedAt
+      ? new Date(event.issuedAt)
+      : new Date();
+
+    const eventId =
+      event?.eventId ||
+      event?.id ||
+      event?.notificationId ||
+      `${type}:${occurredAt.getTime()}:${event?.data?.id ?? 'no-data-id'}`;
+
+    try {
+      await WebhookEvent.create({
+        provider,
+        eventId,
+        type,
+        occurredAt,
+        payload: event,
+        status: 'pending',
+      });
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        // duplicate key error (already persisted)
+        console.info(`[PaddleService] Duplicate webhook (eventId=${eventId}) — ignored.`);
+        return;
+      }
+      console.error('[PaddleService] Failed to persist webhook event:', err);
+      throw err;
+    }
+  }
+
 }
 
 export default new PaddleService();

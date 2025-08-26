@@ -41,8 +41,8 @@ const noIndex = require('./middleware/noIndex');
 const routes = require('./routes');
 
 //paddle integration routes
-const billingRoutes = require('./routes/billing.ts').default;
-const paddleRoutes = require('./routes/paddle.ts').default;
+const billingRoutes = require('./routes/billing').default;
+const paddleRoutes = require('./routes/paddle').default;
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
@@ -75,6 +75,7 @@ const startServer = async () => {
   app.get('/health', (_req, res) => res.status(200).send('OK'));
 
   /* Middleware */
+  app.use('/api/paddle/webhooks', express.raw({ type: 'application/json' })); //for paddle 
   app.use(noIndex);
   app.use(express.json({ limit: '3mb' }));
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
