@@ -22,6 +22,8 @@ export default defineConfig(({ command }) => ({
         changeOrigin: true,
       },
     },
+    // Allowlisted hosts for dev paddle server (add the ngrok host from the error)
+    allowedHosts: ['literate-neutral-bedbug.ngrok-free.app'],
   },
   // Set the directory where environment variables are loaded from and restrict prefixes
   envDir: '../',
