@@ -1,8 +1,7 @@
-// api/server/services/Billing/index.ts
 
-import PaddleService from '../Paddle/PaddleService';
+import PaddleService from './PaddleService';
 import { CreateCustomerRequestBody, Customer } from '@paddle/paddle-node-sdk';
-import { ModelTier, PlanBase } from '../../../../packages/data-schemas/billing';
+import { ModelTier, PlanBase } from '@librechat/data-schemas/billing';
 export type Plan = PlanBase & { priceId: string };
 
 function optionalEnv(name: string): string {

@@ -1,5 +1,5 @@
 import express from 'express';
-import BillingService from '../services/Billing';
+import BillingService from '../services/Paddle/BillingService';
 import { CreateCustomerRequestBody } from '@paddle/paddle-node-sdk';
 
 const router = express.Router();

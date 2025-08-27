@@ -5,7 +5,7 @@ import logger from '../../../utils/logger';
 import { Types } from 'mongoose';
 import { toObjectId } from '../../../utils/objectId';
 import CustomerLink from '../../../models/CustomerLink';
-import { PRICE_TO_PLAN, type Plan } from '../Billing';
+import { PRICE_TO_PLAN, type Plan } from './BillingService';
 
 const PLAN_ID_TO_ENUM: Record<Plan['id'], SubscriptionPlan> = {
   free:     SubscriptionPlan.FREE,

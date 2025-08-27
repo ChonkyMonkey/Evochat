@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import BillingService from '../services/Billing';
+import BillingService from '../services/Paddle/BillingService';
 import { Paddle, Environment, EventName } from '@paddle/paddle-node-sdk';
 import PaddleService from '../services/Paddle/PaddleService';
 
