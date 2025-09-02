@@ -2,7 +2,22 @@
 import PaddleService from './PaddleService';
 import { CreateCustomerRequestBody, Customer } from '@paddle/paddle-node-sdk';
 import { ModelTier, PlanBase } from '@librechat/data-schemas/billing';
+import Subscription, { SubscriptionPlan, SubscriptionStatus } from '../../../models/Subscription';
+import { usageService } from './usageInitializer';
+import { CostGuardResult } from './UsageService';
 export type Plan = PlanBase & { priceId: string };
+
+export interface AllowanceResult {
+  allowed: boolean;
+  reason: string;
+  resetETA?: string;
+}
+
+export interface TierSelectionResult {
+  effectiveTier: ModelTier;
+  reason: string;
+  resetETA?: string;
+}
 
 function optionalEnv(name: string): string {
   const v = process.env[name] || '';
@@ -157,6 +172,190 @@ class BillingService {
       console.error('Error in BillingService creating customer:', error);
       throw new Error('Failed to create customer via Billing Service.');
     }
+  }
+
+  /**
+   * Check if a user is allowed to use a specific model tier
+   * @param userId User ID to check
+   * @param tier Model tier to check
+   * @returns Allowance result with reason and optional reset time
+   */
+  async isAllowed(userId: string, tier: ModelTier): Promise<AllowanceResult> {
+    try {
+      // Get user's subscription or fall back to free plan
+      const subscription = await Subscription.findOne({ userId }).lean();
+      const planId = subscription?.planId || 'free';
+      const plan = this.getPlanById(planId);
+
+      // Check rolling window limits
+      for (const windowLimit of plan.windowLimits || []) {
+        if (windowLimit.tier === tier) {
+          const currentUsage = await usageService.getRollingWindowUsage(
+            userId,
+            tier,
+            windowLimit.windowSeconds
+          );
+          
+          if (currentUsage >= windowLimit.limit) {
+            // Calculate reset time (current time + remaining window seconds)
+            const now = Date.now();
+            const resetTime = new Date(now + windowLimit.windowSeconds * 1000).toISOString();
+            return {
+              allowed: false,
+              reason: 'window_cap',
+              resetETA: resetTime
+            };
+          }
+        }
+      }
+
+      // Check weekly limits
+      for (const weeklyLimit of plan.weeklyLimits || []) {
+        if (weeklyLimit.tier === tier) {
+          const currentUsage = await usageService.getWeeklyUsage(userId, tier);
+          
+          if (currentUsage >= weeklyLimit.limit) {
+            // Weekly limits reset at end of current week
+            const now = Date.now();
+            const { weekEndTs } = this.getWeekEndInfo(now);
+            return {
+              allowed: false,
+              reason: 'weekly_cap',
+              resetETA: new Date(weekEndTs).toISOString()
+            };
+          }
+        }
+      }
+
+      // Check monthly soft caps
+      for (const softCap of plan.monthlySoftCaps || []) {
+        if (softCap.tier === tier) {
+          const currentUsage = await usageService.getMonthlySoftCap(userId, tier);
+          
+          if (currentUsage >= softCap.cap) {
+            // Monthly soft caps reset at end of current month
+            const now = Date.now();
+            const monthEnd = this.getMonthEnd(now);
+            return {
+              allowed: false,
+              reason: 'soft_cap',
+              resetETA: monthEnd.toISOString()
+            };
+          }
+        }
+      }
+
+      // Check cost guard
+      const costGuardResult = await usageService.checkCostGuard(userId, plan.monthlyCogsBudgetEUR, tier);
+      if (!costGuardResult.allowed) {
+        return {
+          allowed: false,
+          reason: 'cost_guard',
+          resetETA: this.getMonthEnd(Date.now()).toISOString()
+        };
+      }
+
+      // All checks passed
+      return {
+        allowed: true,
+        reason: 'ok'
+      };
+
+    } catch (error) {
+      console.error('Error in BillingService.isAllowed:', error);
+      // On error, default to not allowed with unknown reason
+      return {
+        allowed: false,
+        reason: 'error'
+      };
+    }
+  }
+
+  /**
+   * Choose the best available tier for a user based on their plan and usage
+   * @param userId User ID
+   * @param requestedTier The tier the user requested
+   * @returns The effective tier to use with reason and optional reset time
+   */
+  async chooseTier(userId: string, requestedTier: ModelTier): Promise<TierSelectionResult> {
+    try {
+      // Get user's subscription or fall back to free plan
+      const subscription = await Subscription.findOne({ userId }).lean();
+      const planId = subscription?.planId || 'free';
+      const plan = this.getPlanById(planId);
+
+      // Start with requested tier and walk through fallback chain
+      const tiersToTry = [requestedTier, ...plan.fallbackChain];
+
+      for (const tier of tiersToTry) {
+        const allowance = await this.isAllowed(userId, tier);
+        
+        if (allowance.allowed) {
+          return {
+            effectiveTier: tier,
+            reason: 'ok',
+            resetETA: allowance.resetETA
+          };
+        }
+
+        // If this tier is not allowed but it's the last one in the chain (mini tier),
+        // return it anyway as the final fallback
+        if (tier === tiersToTry[tiersToTry.length - 1]) {
+          return {
+            effectiveTier: tier,
+            reason: allowance.reason,
+            resetETA: allowance.resetETA
+          };
+        }
+      }
+
+      // Should never reach here, but return the last tier as fallback
+      const lastTier = tiersToTry[tiersToTry.length - 1];
+      return {
+        effectiveTier: lastTier,
+        reason: 'fallback',
+        resetETA: undefined
+      };
+
+    } catch (error) {
+      console.error('Error in BillingService.chooseTier:', error);
+      // On error, fall back to economy_mini
+      return {
+        effectiveTier: 'economy_mini',
+        reason: 'error',
+        resetETA: undefined
+      };
+    }
+  }
+
+  // Helper methods for time calculations
+  private getWeekEndInfo(nowMs: number): { weekEndTs: number } {
+    const d = new Date(nowMs);
+    const dow = d.getUTCDay() || 7; // Mon=1..Sun=7
+    const thurs = new Date(d);
+    thurs.setUTCDate(d.getUTCDate() + (4 - dow));
+    const isoYear = thurs.getUTCFullYear();
+
+    const jan1 = new Date(Date.UTC(isoYear, 0, 1));
+    const jan1Dow = jan1.getUTCDay() || 7;
+    const week1Mon = new Date(jan1);
+    week1Mon.setUTCDate(jan1.getUTCDate() + (1 - jan1Dow));
+
+    const diffMs = d.getTime() - week1Mon.getTime();
+    const isoWeek = Math.floor(diffMs / (7 * 24 * 3600 * 1000)) + 1;
+
+    const weekEndMonAfter = new Date(week1Mon);
+    weekEndMonAfter.setUTCDate(week1Mon.getUTCDate() + isoWeek * 7);
+    const weekEndTs = weekEndMonAfter.getTime() - 1;
+    return { weekEndTs };
+  }
+
+  private getMonthEnd(nowMs: number): Date {
+    const d = new Date(nowMs);
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    const next = new Date(Date.UTC(y, m + 1, 1));
+    return new Date(next.getTime() - 1);
   }
 }
 

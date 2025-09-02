@@ -4,6 +4,10 @@
 // because your ioredis client already applies keyPrefix from env.
 
 import { randomUUID } from 'crypto';
+import logger from '../../../utils/logger';
+import CurrencyService, { RedisLike } from './CurrencyService';
+
+import { getMultiplier } from '../../../models/tx';
 
 export type ModelTier =
   | 'economy'
@@ -14,30 +18,34 @@ export type ModelTier =
   | 'standard_mini'
   | 'premium_mini';
 
-// Minimal surface compatible with ioredis
-export interface RedisLike {
-  zadd(key: string, score: number, member: string): Promise<number>;
-  zremrangebyscore(key: string, min: number | string, max: number | string): Promise<number>;
-  zcard(key: string): Promise<number>;
-  incrby(key: string, by: number): Promise<number>;
-  incrbyfloat?(key: string, by: number): Promise<number>;
-  get(key: string): Promise<string | null>;
-  ttl(key: string): Promise<number>;
-  expireat(key: string, when: number): Promise<number>;
-}
 
 export interface UsageServiceOptions {
   namespace?: string;      // optional sub-namespace: defaults to 'usage'
   nowMs?: () => number;    // test hook; default Date.now
+  exchangeRateApiUrl?: string; // exchange rate API URL; defaults to ECB
+}
+
+export interface CostGuardResult {
+  allowed: boolean;
+  reason?: 'ok' | 'cost_guard_warning' | 'cost_guard_blocked';
+  message?: string;
+  currentCogsEUR: number;
+  budgetEUR: number;
+  percentageUsed: number;
 }
 
 export default class UsageService {
   private redis: RedisLike;
+  private currencyService: CurrencyService;
   private ns: string;
   private nowMs: () => number;
 
   constructor(redis: RedisLike, opts: UsageServiceOptions = {}) {
     this.redis = redis;
+    this.currencyService = new CurrencyService(redis, {
+      namespace: opts.namespace ? `${opts.namespace}:currency` : 'currency',
+      nowMs: opts.nowMs,
+    });
     this.ns = (opts.namespace ?? 'usage').replace(/:$/,'');
     this.nowMs = opts.nowMs ?? (() => Date.now());
   }
@@ -107,6 +115,68 @@ export default class UsageService {
     return newVal;
   }
 
+  /** Track token usage cost and add to monthly COGS in EUR */
+  async trackTokenCost(userId: string, model: string, promptTokens: number, completionTokens: number, endpoint?: string): Promise<number> {
+    // Calculate USD cost using existing pricing system
+    const promptCostUSD = this.calculateTokenCostUSD(model, 'prompt', promptTokens, endpoint);
+    const completionCostUSD = this.calculateTokenCostUSD(model, 'completion', completionTokens, endpoint);
+    const totalCostUSD = promptCostUSD + completionCostUSD;
+
+    // Convert USD to EUR using current exchange rate
+    const exchangeRate = await this.currencyService.getUSDToEURRate();
+    const totalCostEUR = totalCostUSD * exchangeRate;
+
+    // Add to monthly COGS tracking
+    return this.incrementMonthlyCogs(userId, totalCostEUR);
+  }
+
+  /** Calculate token cost in USD using existing pricing system */
+  private calculateTokenCostUSD(model: string, tokenType: 'prompt' | 'completion', tokenCount: number, endpoint?: string): number {
+    if (tokenCount <= 0) return 0;
+
+    const multiplier = getMultiplier({ model, tokenType, endpoint });
+    // Multiplier is USD per 1M tokens, so calculate cost for actual token count
+    const costPerToken = multiplier / 1000000;
+    return tokenCount * costPerToken;
+  }
+
+
+  /** Check cost guard thresholds and return decision */
+  async checkCostGuard(userId: string, monthlyBudgetEUR: number, requestedTier?: ModelTier): Promise<CostGuardResult> {
+    const currentCogsEUR = await this.getMonthlyCogs(userId);
+    const percentageUsed = monthlyBudgetEUR > 0 ? (currentCogsEUR / monthlyBudgetEUR) * 100 : 0;
+
+    if (percentageUsed >= 110) {
+      return {
+        allowed: false,
+        reason: 'cost_guard_blocked',
+        message: 'Monthly budget exceeded by 110%. Please upgrade your plan to continue using premium models.',
+        currentCogsEUR,
+        budgetEUR: monthlyBudgetEUR,
+        percentageUsed
+      };
+    }
+
+    if (percentageUsed >= 90) {
+      return {
+        allowed: true,
+        reason: 'cost_guard_warning',
+        message: `Warning: You've used ${percentageUsed.toFixed(1)}% of your monthly budget. Consider upgrading to avoid service interruptions.`,
+        currentCogsEUR,
+        budgetEUR: monthlyBudgetEUR,
+        percentageUsed
+      };
+    }
+
+    return {
+      allowed: true,
+      reason: 'ok',
+      currentCogsEUR,
+      budgetEUR: monthlyBudgetEUR,
+      percentageUsed
+    };
+  }
+
   /** Monthly COGS: get current value. */
   async getMonthlyCogs(userId: string, now?: number): Promise<number> {
     const { cogsKey, centsKey } = this.cogsKey(now ?? this.nowMs(), userId);
@@ -146,6 +216,10 @@ export default class UsageService {
     const mm = pad2(d.getUTCMonth() + 1);
     const base = `cogs:${userId}:${yyyy}-${mm}`;
     return { cogsKey: base, centsKey: `${base}:cents`, expireAtSec: Math.floor(endOfMonthUtc(d).getTime() / 1000) };
+  }
+
+  private get options(): UsageServiceOptions {
+    return this as any;
   }
 
   private async ensureExpireAt(key: string, expireAtSec: number) {
