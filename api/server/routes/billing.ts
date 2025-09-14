@@ -37,7 +37,12 @@ router.post('/customer', async (req, res) => {
 router.post('/usage/choose-tier', requireJwtAuth, async (req, res) => {
   try {
     const user = req.user as IUser;
-    const { requestedTier } = req.body;
+    const {
+      requestedTier,
+      prompt,
+      conversationContext,
+      mode = 'standard'
+    } = req.body;
 
     // Validate requestedTier is provided
     if (!requestedTier) {
@@ -57,8 +62,43 @@ router.post('/usage/choose-tier', requireJwtAuth, async (req, res) => {
       });
     }
 
+    // Validate mode is valid
+    const validModes = ['auto', 'standard', 'premium'];
+    if (mode && !validModes.includes(mode)) {
+      return res.status(400).json({
+        message: 'Invalid mode',
+        validModes
+      });
+    }
+
+    // Validate conversationContext structure if provided
+    if (conversationContext && !Array.isArray(conversationContext)) {
+      return res.status(400).json({
+        message: 'conversationContext must be an array'
+      });
+    }
+
+    if (conversationContext) {
+      for (const message of conversationContext) {
+        if (!message.role || !message.content || typeof message.role !== 'string' || typeof message.content !== 'string') {
+          return res.status(400).json({
+            message: 'Each message in conversationContext must have role and content as strings'
+          });
+        }
+      }
+    }
+
     const userId = user._id?.toString() || user.id;
-    const result = await BillingService.chooseTier(userId, requestedTier as ModelTier);
+    const result = await BillingService.chooseTier(
+      userId,
+      requestedTier as ModelTier,
+      {
+        mode,
+        prompt,
+        conversationContext
+      },
+      req
+    );
 
     res.status(200).json(result);
     

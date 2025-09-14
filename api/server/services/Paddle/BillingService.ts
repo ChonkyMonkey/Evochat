@@ -5,6 +5,7 @@ import { ModelTier, PlanBase } from '@librechat/data-schemas/billing';
 import Subscription, { SubscriptionPlan, SubscriptionStatus } from '../../../models/Subscription';
 import { usageService } from './usageInitializer';
 import { CostGuardResult } from './UsageService';
+import AIService, { ConversationMessage } from './AIService';
 export type Plan = PlanBase & { priceId: string };
 
 export interface AllowanceResult {
@@ -17,6 +18,12 @@ export interface TierSelectionResult {
   effectiveTier: ModelTier;
   reason: string;
   resetETA?: string;
+}
+
+export interface ChooseTierOptions {
+  mode?: 'auto' | 'standard' | 'premium';
+  prompt?: string;
+  conversationContext?: ConversationMessage[];
 }
 
 function optionalEnv(name: string): string {
@@ -275,16 +282,132 @@ class BillingService {
    * Choose the best available tier for a user based on their plan and usage
    * @param userId User ID
    * @param requestedTier The tier the user requested
+   * @param options Additional options including mode, prompt, and conversation context
    * @returns The effective tier to use with reason and optional reset time
    */
-  async chooseTier(userId: string, requestedTier: ModelTier): Promise<TierSelectionResult> {
+  async chooseTier(
+    userId: string,
+    requestedTier: ModelTier,
+    options: ChooseTierOptions = {},
+    req?: any // Request object for AI client initialization
+  ): Promise<TierSelectionResult> {
     try {
+      const { mode = 'standard', prompt, conversationContext } = options;
+      
       // Get user's subscription or fall back to free plan
       const subscription = await Subscription.findOne({ userId }).lean();
       const planId = subscription?.planId || 'free';
       const plan = this.getPlanById(planId);
 
-      // Start with requested tier and walk through fallback chain
+      // Handle auto mode with AI selection
+      if (mode === 'auto' && prompt) {
+        try {
+          // Get usage info for AI consideration
+          const usageInfo = await this.getUsageInfoForAI(userId, plan);
+          
+          // Get AI recommendation
+          const aiResult = await AIService.selectModelTier(
+            userId,
+            prompt,
+            conversationContext,
+            {
+              primitiveRemaining: usageInfo.primitiveRemaining,
+              normalRemaining: usageInfo.normalRemaining,
+              smartRemaining: usageInfo.smartRemaining
+            },
+            req // Pass the request object for client initialization
+          );
+
+          // Map AI recommendation to actual model tiers
+          const aiRecommendedTier = this.mapAITierToModelTier(aiResult.recommendedTier);
+          
+          // Check if AI recommended tier is allowed
+          const aiAllowance = await this.isAllowed(userId, aiRecommendedTier);
+          
+          if (aiAllowance.allowed) {
+            return {
+              effectiveTier: aiRecommendedTier,
+              reason: 'ai_recommendation',
+              resetETA: aiAllowance.resetETA
+            };
+          }
+          
+          // If AI recommended tier is not allowed, continue with normal fallback
+          // but use the AI recommendation as the starting point
+          requestedTier = aiRecommendedTier;
+          
+        } catch (aiError) {
+          console.error('Error in AI tier selection, falling back to standard logic:', aiError);
+          // Continue with normal logic if AI fails
+        }
+      }
+
+      // Handle forced modes with soft limit enforcement
+      if (mode === 'premium') {
+        // Force smart tier if possible, otherwise use fallback
+        const smartTiers = ['premium', 'flagship'] as ModelTier[];
+        for (const tier of smartTiers) {
+          const allowance = await this.isAllowed(userId, tier);
+          if (allowance.allowed) {
+            return {
+              effectiveTier: tier,
+              reason: 'forced_premium',
+              resetETA: allowance.resetETA
+            };
+          }
+        }
+        // If smart tiers are not allowed due to soft limits, fall back to normal
+        const normalTiers = ['standard'] as ModelTier[];
+        for (const tier of normalTiers) {
+          const allowance = await this.isAllowed(userId, tier);
+          if (allowance.allowed) {
+            return {
+              effectiveTier: tier,
+              reason: 'forced_premium_fallback',
+              resetETA: allowance.resetETA
+            };
+          }
+        }
+        // Final fallback to primitive
+        const primitiveTiers = ['economy'] as ModelTier[];
+        for (const tier of primitiveTiers) {
+          const allowance = await this.isAllowed(userId, tier);
+          if (allowance.allowed) {
+            return {
+              effectiveTier: tier,
+              reason: 'forced_premium_fallback',
+              resetETA: allowance.resetETA
+            };
+          }
+        }
+      } else if (mode === 'standard') {
+        // Force normal tier if possible, otherwise use fallback
+        const normalTiers = ['standard'] as ModelTier[];
+        for (const tier of normalTiers) {
+          const allowance = await this.isAllowed(userId, tier);
+          if (allowance.allowed) {
+            return {
+              effectiveTier: tier,
+              reason: 'forced_standard',
+              resetETA: allowance.resetETA
+            };
+          }
+        }
+        // If normal not available due to soft limits, try primitive
+        const primitiveTiers = ['economy'] as ModelTier[];
+        for (const tier of primitiveTiers) {
+          const allowance = await this.isAllowed(userId, tier);
+          if (allowance.allowed) {
+            return {
+              effectiveTier: tier,
+              reason: 'forced_standard_fallback',
+              resetETA: allowance.resetETA
+            };
+          }
+        }
+      }
+
+      // Normal fallback logic
       const tiersToTry = [requestedTier, ...plan.fallbackChain];
 
       for (const tier of tiersToTry) {
@@ -325,6 +448,83 @@ class BillingService {
         reason: 'error',
         resetETA: undefined
       };
+    }
+  }
+
+  /**
+   * Get usage information for AI consideration
+   */
+  private async getUsageInfoForAI(userId: string, plan: Plan): Promise<{ primitiveRemaining: number; normalRemaining: number; smartRemaining: number }> {
+    // Calculate remaining usage for three intelligence tiers
+    const primitiveRemaining = await this.calculateRemainingUsage(userId, plan, ['economy']);
+    const normalRemaining = await this.calculateRemainingUsage(userId, plan, ['standard']);
+    const smartRemaining = await this.calculateRemainingUsage(userId, plan, ['premium', 'flagship']);
+    
+    return { primitiveRemaining, normalRemaining, smartRemaining };
+  }
+
+  /**
+   * Calculate remaining usage for specific tier groups
+   */
+  private async calculateRemainingUsage(userId: string, plan: Plan, tiers: ModelTier[]): Promise<number> {
+    let totalRemaining = 0;
+    
+    for (const tier of tiers) {
+      // Check rolling window limits
+      for (const windowLimit of plan.windowLimits || []) {
+        if (windowLimit.tier === tier) {
+          const currentUsage = await usageService.getRollingWindowUsage(
+            userId,
+            tier,
+            windowLimit.windowSeconds
+          );
+          const remaining = Math.max(0, windowLimit.limit - currentUsage);
+          totalRemaining += remaining;
+        }
+      }
+      
+      // Check weekly limits
+      for (const weeklyLimit of plan.weeklyLimits || []) {
+        if (weeklyLimit.tier === tier) {
+          const currentUsage = await usageService.getWeeklyUsage(userId, tier);
+          const remaining = Math.max(0, weeklyLimit.limit - currentUsage);
+          totalRemaining += remaining;
+        }
+      }
+      
+      // Check monthly soft caps (treat as available if not exceeded)
+      for (const softCap of plan.monthlySoftCaps || []) {
+        if (softCap.tier === tier) {
+          const currentUsage = await usageService.getMonthlySoftCap(userId, tier);
+          if (currentUsage < softCap.cap) {
+            // Add a reasonable estimate of remaining monthly usage
+            totalRemaining += Math.max(0, softCap.cap - currentUsage);
+          }
+        }
+      }
+    }
+    
+    // If no specific limits found for these tiers, assume availability
+    if (totalRemaining === 0) {
+      totalRemaining = 10; // Small buffer to indicate availability
+    }
+    
+    return totalRemaining;
+  }
+
+  /**
+   * Map AI three-tier recommendation to actual model tiers
+   */
+  private mapAITierToModelTier(aiTier: 'primitive' | 'normal' | 'smart'): ModelTier {
+    switch (aiTier) {
+      case 'primitive':
+        return 'economy'; // Start with economy, fallback will handle if not available
+      case 'normal':
+        return 'standard'; // Start with standard, fallback will handle if not available
+      case 'smart':
+        return 'premium'; // Start with premium, fallback will handle if not available
+      default:
+        return 'standard'; // Default to standard
     }
   }
 
