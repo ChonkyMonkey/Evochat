@@ -1239,5 +1239,10 @@
   "com_ui_x_selected": "{{0}} selected",
   "com_ui_yes": "Yes",
   "com_ui_zoom": "Zoom",
-  "com_user_message": "You"
+  "com_user_message": "You",
+  "com_paddle_mode_auto": "Auto",
+  "com_paddle_mode_standard": "Standard",
+  "com_paddle_mode_premium": "Premium",
+  "com_paddle_advanced_mode": "Advanced Mode",
+  "com_paddle_toggle_advanced": "Toggle Advanced Mode"
 }

@@ -83,7 +83,8 @@ export class AIService {
     currentPrompt: string,
     conversationHistory: ConversationMessage[] = [],
     usageInfo?: UsageInfo,
-    req?: Request
+    req?: Request,
+    conversationId?: string
   ): Promise<AIModelSelectionResult> {
     try {
 
@@ -101,7 +102,7 @@ export class AIService {
       // Use LibreChat's client system instead of direct API calls
       const response = await client.sendMessage(userPrompt, {
         user: userId,
-        conversationId: `ai-tier-selection-${userId}-${Date.now()}`,
+        conversationId: `ai-tier-selection-${userId}-${Date.now()}`,  // AI HALLUCINATIONS!! DANGEROUS!! NEED TO FIX LATER!!
         modelOptions: { model: this.decisionModel },
         promptPrefix: systemPrompt,
         temperature: 0.1,

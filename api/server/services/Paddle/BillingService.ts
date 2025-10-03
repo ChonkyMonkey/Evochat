@@ -306,6 +306,9 @@ class BillingService {
           const usageInfo = await this.getUsageInfoForAI(userId, plan);
           
           // Get AI recommendation
+          // Extract conversationId from request if available
+          const conversationId = req?.body?.conversationId;
+          
           const aiResult = await AIService.selectModelTier(
             userId,
             prompt,
@@ -315,7 +318,8 @@ class BillingService {
               normalRemaining: usageInfo.normalRemaining,
               smartRemaining: usageInfo.smartRemaining
             },
-            req // Pass the request object for client initialization
+            req, // Pass the request object for client initialization
+            conversationId // Pass the conversationId for proper tracking
           );
 
           // Map AI recommendation to actual model tiers

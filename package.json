@@ -124,7 +124,7 @@
   },
   "overrides": {
     "@langchain/openai": "0.5.18",
-    "axios": "1.8.2",
+    "axios": "1.12.1",
     "elliptic": "^6.6.1",
     "form-data": "^4.0.4",
     "mdast-util-gfm-autolink-literal": "2.0.0",
@@ -154,6 +154,21 @@
     ]
   },
   "dependencies": {
-    "expr-eval": "^2.0.2"
+    "append-field": "^2.0.0",
+    "busboy": "^1.6.0",
+    "compressible": "^2.0.18",
+    "expr-eval": "^2.0.2",
+    "file-stream-rotator": "^1.0.0",
+    "i18next": "^24.2.2",
+    "moment": "^2.30.1",
+    "mongodb": "^6.19.0",
+    "oauth4webapi": "^3.8.1",
+    "outvariant": "^1.4.3",
+    "react-i18next": "^15.4.0",
+    "redis": "^5.8.2",
+    "uid-safe": "^2.1.5",
+    "xml-crypto": "^6.1.2",
+    "xml-encryption": "^3.1.0",
+    "xml2js": "^0.6.2"
   }
 }
